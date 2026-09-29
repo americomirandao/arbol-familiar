@@ -1,0 +1,2050 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<!-- Árbol Familiar v11 (2026-09-29) · archivo único offline · ES5, sin CSS Grid ni variables CSS
+     v2: padre/madre desconocidos quedan en blanco; nota automática cuando una pareja son parientes
+     (primos, etc.); orden de apellidos configurable (paterno–materno o materno–paterno) y botón ⇄.
+     v3: datos en IndexedDB (mucho más espacio; migra solo desde localStorage, que queda como respaldo
+     si el navegador no tiene IndexedDB) y botón “Compartir copia” (WhatsApp, Drive, Archivos, correo).
+     v4: versión fácil para personas mayores: letra y botones grandes, botón GUARDAR siempre visible,
+     persona nueva en 6 pasos (una pregunta por pantalla), ficha con palabras simples, impresión en un toque.
+     v5: GUARDAR y el aviso “✅ Guardado” solo confirman si el teléfono de verdad guardó (si falla, lo dice y
+     ofrece enviar copia); pista de apellidos según el orden elegido; fecha de la última copia en hora local;
+     teléfono en horizontal ya no tapa el árbol; un doble toque ya no cierra las ventanas; aviso sin tapar el título.
+     v6: “Un hermano o hermana” funciona aunque no se conozca a los papás: se pregunta si comparten papá, mamá
+     o ambos y se crea un papá/mamá “(sin nombre)” para unirlos (mismo formato JSON, sin campos nuevos).
+     v7: la vista del árbol muestra a los hermanos de la persona central en su misma fila (mayores a la
+     izquierda, menores a la derecha); medios hermanos en los extremos, con línea punteada y nota al pie.
+     v8: personas repetidas: botón “Es la misma persona que…” para unirlas; aviso al anotar a alguien con el
+     mismo nombre; al agregar papá o mamá se ofrece primero la esposa/esposo del otro; la 3.ª pareja o más
+     también se dibuja unida con una línea; tocar el nombre del árbol (arriba) permite cambiarlo.
+     v9: la app detecta sola a las personas anotadas dos veces (mismo nombre y apellidos) y muestra un aviso
+     amarillo en el árbol y en la ficha para juntarlas; después pregunta de qué hijos de la pareja es papá/mamá.
+     v10: “Revisar parentesco”: cruza los apellidos y propone quién podría ser hermano o hijo de quién
+     (mismos apellidos que los hijos de una pareja y sin papá/mamá distintos); también al agregar un hijo.
+     v11: papeles grandes para imprenta o plotter (A2, A1, A0) y botón “Póster en 1 hoja grande”, que elige
+     el papel más chico en que la letra se lee bien.
+     (compatible con Android 4.4+ y iPhone). Los datos se guardan en el propio teléfono
+     (localStorage) y se respaldan exportando un archivo .json o .ged (GEDCOM). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="description" content="Árbol Familiar — árbol genealógico sin límite de personas ni generaciones, que funciona sin internet y se imprime en una o varias hojas." />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Árbol Familiar" />
+<meta name="theme-color" content="#2F5D50" />
+<link rel="manifest" href="manifest.webmanifest" />
+<title>Árbol Familiar</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:#F6F1E7;color:#1F1B16;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:19px;line-height:1.35;padding-bottom:170px}
+button,input,select,textarea{font-family:inherit;font-size:19px}
+header.top{background:#2F5D50;color:#fff;padding:10px 16px;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center}
+header.top .tt{-webkit-flex:1;flex:1;min-width:0}
+header.top .t1{font-size:12px;letter-spacing:.18em;color:#E8C98A;margin:0;font-weight:700}
+header.top h1{cursor:pointer;margin:2px 0 0;font-size:23px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.top .aa{border:2px solid #E8C98A;background:none;color:#fff;border-radius:12px;padding:6px 12px;font-weight:800;font-size:19px;margin-left:10px;cursor:pointer}
+.wrap{max-width:720px;margin:0 auto;padding:14px 16px}
+.view{display:none}
+.view.on{display:block}
+.card{background:#fff;border:2px solid #E4DCCB;border-radius:18px;padding:16px;margin-bottom:14px}
+.card h2{margin:0 0 10px;font-size:22px}
+.muted{color:#5A5247;font-size:17px}
+.gran{font-size:21px;line-height:1.4}
+.row{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;-webkit-align-items:center;align-items:center;margin:-5px}
+.row>*{margin:5px}
+.grow{-webkit-flex:1 1 140px;flex:1 1 140px;min-width:0}
+.btn{display:inline-block;border:0;border-radius:16px;padding:14px 18px;min-height:56px;background:#2F5D50;color:#fff;font-weight:800;font-size:19px;cursor:pointer;text-decoration:none;text-align:center;line-height:1.25}
+.btn:active{opacity:.75}
+.btn.sec{background:#fff;color:#2F5D50;border:3px solid #2F5D50;padding:11px 15px}
+.btn.warn{background:#A33B2B}
+.btn.ocre{background:#B8741A}
+.btn.sm{min-height:48px;padding:9px 13px;font-size:17px;border-radius:12px}
+.btn.block{display:block;width:100%;margin-top:10px}
+.btn.xl{font-size:23px;min-height:72px;padding:16px 18px}
+.btn.izq{text-align:left}
+.mas{display:block;width:100%;margin-top:14px;background:none;border:0;color:#2F5D50;font-weight:800;font-size:18px;padding:12px;text-decoration:underline;cursor:pointer}
+.oculto{display:none}
+label.f{display:block;font-size:18px;font-weight:800;color:#3D362E;margin:14px 0 6px}
+input.i,select.i,textarea.i{width:100%;padding:14px;border:2px solid #BDB29C;border-radius:14px;background:#fff;color:#1F1B16;font-size:21px}
+input.i:focus,textarea.i:focus{border-color:#2F5D50;outline:none}
+textarea.i{min-height:90px}
+.chk{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;margin-top:12px;font-size:19px}
+.chk input{width:28px;height:28px;margin:0 10px 0 0}
+/* barra inferior */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:2px solid #DDD3C0;display:-webkit-flex;display:flex;z-index:20;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{-webkit-flex:1;flex:1;border:0;background:none;padding:8px 2px 10px;height:76px;color:#5A5247;font-size:15px;font-weight:800;cursor:pointer}
+nav.tabs button b{display:block;font-size:28px;line-height:32px}
+nav.tabs button.on{color:#2F5D50;background:#E3EFE9}
+/* botón GUARDAR siempre visible */
+#btnGuardar{position:fixed;left:0;right:0;bottom:76px;z-index:30;background:#B8741A;color:#fff;border:0;border-top:3px solid #fff;padding:14px 12px;min-height:62px;font-size:23px;font-weight:900;box-shadow:0 -2px 10px rgba(0,0,0,.2);cursor:pointer;margin-bottom:env(safe-area-inset-bottom)}
+#btnGuardar:active{opacity:.8}
+#toast{display:none;position:fixed;left:50%;bottom:150px;margin-left:-130px;width:260px;z-index:60;background:#2F5D50;color:#fff;border-radius:16px;padding:14px;text-align:center;font-weight:800;font-size:20px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+/* árbol */
+.tbar{background:#fff;border-bottom:2px solid #E4DCCB;padding:10px 12px}
+.tbar .foc{font-weight:800;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbar select{padding:8px;border:2px solid #BDB29C;border-radius:10px;background:#fff;font-size:18px}
+.pista{font-size:16px;color:#3D362E;margin:8px 0 0}
+#lienzo{overflow:auto;-webkit-overflow-scrolling:touch;background:#FBF8F2;position:relative}
+#lienzo svg{display:block}
+.aviso{background:#FFF1CC;border:2px solid #E0B75C;border-radius:14px;padding:12px 14px;margin:10px 12px 0;font-size:18px}
+.aviso a{color:#2F5D50}
+.vacio{text-align:center;padding:36px 20px}
+.vacio .big{font-size:70px}
+/* lista */
+.pl{list-style:none;margin:0;padding:0}
+.pl li{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:12px 6px;border-bottom:2px solid #EFE8DA;cursor:pointer;min-height:68px}
+.pl li:active{background:#F3EEE3}
+.av{width:50px;height:50px;border-radius:25px;background:#E6E0D3;margin-right:12px;-webkit-flex:0 0 50px;flex:0 0 50px;overflow:hidden;text-align:center;line-height:50px;font-weight:800;color:#fff;font-size:19px}
+.av img{width:50px;height:50px;display:block}
+.av.M{background:#3E7CB1}.av.F{background:#B8456E}.av.U{background:#8C8577}
+.pl .nm{font-weight:800;font-size:20px}
+/* modal */
+#modal{display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:50;overflow:auto;-webkit-overflow-scrolling:touch}
+#modal .sheet{background:#F6F1E7;max-width:560px;margin:14px auto 100px;border-radius:20px;padding:18px 16px;position:relative}
+#modal .x{position:absolute;right:10px;top:10px;border:0;background:#E4DCCB;border-radius:24px;width:48px;height:48px;font-size:22px;font-weight:800;cursor:pointer}
+#modal h3{margin:0 56px 12px 0;font-size:25px;line-height:1.2}
+.rel{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:12px 4px;border-bottom:2px solid #EFE8DA;cursor:pointer;min-height:60px}
+.rel:active{background:#F3EEE3}
+.rel .lab{width:92px;-webkit-flex:0 0 92px;flex:0 0 92px;font-size:16px;color:#5A5247;font-weight:800}
+.rel .val{-webkit-flex:1;flex:1;min-width:0;font-weight:800;color:#2F5D50;font-size:20px}
+.rel .val span{font-weight:normal;color:#5A5247;font-size:16px}
+.foto{width:120px;height:120px;border-radius:18px;background:#E6E0D3;display:block;margin:0 auto 10px}
+.paso{font-size:16px;font-weight:800;color:#2F5D50;letter-spacing:.05em;margin:0 56px 6px 0}
+.puntos{margin:0 0 14px}
+.puntos i{display:inline-block;width:14px;height:14px;border-radius:7px;background:#D5CCB8;margin-right:6px}
+.puntos i.on{background:#2F5D50}
+.preg{font-size:26px;font-weight:900;margin:4px 0 6px;line-height:1.2}
+.ok{text-align:center;font-size:70px;margin:6px 0}
+.nojs{background:#A33B2B;color:#fff;padding:14px 16px;font-weight:700}
+body.g2 .wrap,body.g2 #modal .sheet,body.g2 .tbar{zoom:1.15}
+body.g3 .wrap,body.g3 #modal .sheet,body.g3 .tbar{zoom:1.3}
+/* teléfono en horizontal (poca altura): barras y cabecera más bajas para que se vea el árbol */
+@media (orientation:landscape) and (max-height:520px){
+  header.top{padding:4px 16px}
+  header.top .t1{display:none}
+  header.top h1{font-size:19px}
+  header.top .aa{padding:2px 10px}
+  .tbar{padding:4px 12px}
+  .tbar .btn.sm{min-height:40px;padding:5px 10px}
+  .pista{display:none}
+  .tbar .mas{padding:2px!important;margin-top:0!important}
+  nav.tabs button{height:50px;padding:4px 2px}
+  nav.tabs button b{display:inline;font-size:20px;line-height:22px;margin-right:6px}
+  #btnGuardar{bottom:50px;min-height:42px;padding:6px 12px;font-size:18px;border-top-width:2px}
+  #toast{bottom:100px}
+  body{padding-bottom:100px}
+}
+#printArea{display:none}
+@media print{
+  body{background:#fff;padding:0}
+  .noprint{display:none!important}
+  #printArea{display:block!important}
+  .pg{page-break-after:always;page-break-inside:avoid}
+  .pg:last-child{page-break-after:auto}
+  .pg .ph{font:bold 11pt Helvetica,Arial,sans-serif;margin:0 0 2mm;height:8mm;overflow:hidden}
+  .pg .ph span{font-weight:normal;color:#555;float:right}
+  table.pt{border-collapse:collapse;width:100%;font:9pt Helvetica,Arial,sans-serif}
+  table.pt th,table.pt td{border:1px solid #999;padding:3px 4px;text-align:left;vertical-align:top}
+  table.pt th{background:#eee}
+  table.pt tr{page-break-inside:avoid}
+}
+</style>
+<style id="pageStyle">@page{size:A4 landscape;margin:10mm}</style>
+</head>
+<body>
+<noscript><div class="nojs">Esta app necesita JavaScript. Si la abriste desde la vista previa de “Archivos” del iPhone o desde un visor de correo, ábrela en Safari o Chrome.</div></noscript>
+<div id="sinjs" class="nojs">Cargando… Si este mensaje no desaparece, ábrela en Safari o Chrome.</div>
+
+<header class="top noprint">
+  <div class="tt"><p class="t1">ÁRBOL FAMILIAR</p><h1 id="hTitulo" onclick="App.renombrar()" title="Tocar para cambiar el nombre">Mi familia</h1></div>
+  <button class="aa" onclick="App.letra()" aria-label="Cambiar tamaño de letra">Aa</button>
+</header>
+
+<!-- ===== ÁRBOL ===== -->
+<section id="vArbol" class="view on noprint">
+  <div class="tbar">
+    <div class="foc" id="focNom">—</div>
+    <div class="row" style="margin-top:4px">
+      <button class="btn sm sec grow" onclick="App.zoom(-1)">➖ Más chico</button>
+      <button class="btn sm sec grow" onclick="App.zoom(1)">➕ Más grande</button>
+      <button class="btn sm sec grow" onclick="App.zoom(0)">🔍 Ver todo</button>
+    </div>
+    <p class="pista">👆 Toca a una persona para ver sus datos o agregar a su familia.</p>
+    <div id="avisoRep"></div>
+    <button class="btn block sec" style="margin-top:8px" onclick="App.revisaParentesco()">🔎 Revisar parentesco</button>
+    <button class="mas" onclick="App.toggle('opArbol')" style="margin-top:4px;padding:6px">⚙️ Más opciones del árbol</button>
+    <div id="opArbol" class="oculto">
+      <div class="row">
+        <span class="muted">Generaciones hacia arriba</span><select id="selUp" onchange="App.gens()"></select>
+      </div>
+      <div class="row">
+        <span class="muted">Generaciones hacia abajo</span><select id="selDown" onchange="App.gens()"></select>
+      </div>
+      <button class="btn sm sec block" onclick="App.raiz()">🌳 Ver todo desde el abuelo más antiguo</button>
+    </div>
+  </div>
+  <div id="avisoBackup"></div>
+  <div id="lienzo"></div>
+</section>
+
+<!-- ===== FAMILIA (lista) ===== -->
+<section id="vPersonas" class="view noprint">
+  <div class="wrap">
+    <button class="btn xl block" style="margin-top:0" onclick="App.nueva()">➕ Agregar una persona</button>
+    <button class="btn block sec" onclick="App.revisaParentesco()">🔎 Revisar parentesco (cruzar apellidos)</button>
+    <label class="f">🔎 Buscar a alguien</label>
+    <input class="i" id="busca" type="search" placeholder="Escribe un nombre…" oninput="App.lista()" />
+    <p class="muted" id="cuenta"></p>
+    <ul class="pl" id="listaP"></ul>
+  </div>
+</section>
+
+<!-- ===== IMPRIMIR ===== -->
+<section id="vImprimir" class="view noprint">
+  <div class="wrap">
+    <div class="card">
+      <h2>🖨️ Imprimir</h2>
+      <p class="muted">Se imprime el árbol como se ve en la pantalla «Árbol».</p>
+      <button class="btn xl block" onclick="App.impRapida('arbol')">🌳 Imprimir el árbol</button>
+      <button class="btn xl block sec" onclick="App.impRapida('lista')">📋 Imprimir la lista de nombres</button>
+      <button class="btn block sec" onclick="App.impGrande()">🖼️ Póster en 1 hoja grande (A2, A1 o A0)</button>
+      <p class="muted" style="margin:6px 0 0">Para llevar a una imprenta o plotter: guárdalo como PDF y llévalo en USB o envíalo por WhatsApp.</p>
+      <p class="muted" style="margin-top:14px">En la pantalla que aparece, elige tu impresora. Para guardarlo como PDF: en iPhone toca Compartir → “Guardar en Archivos”; en Android elige “Guardar como PDF”.</p>
+    </div>
+    <button class="mas" onclick="App.toggle('opImp')">⚙️ Más opciones de impresión</button>
+    <div id="opImp" class="card oculto">
+      <label class="f">¿Qué imprimir?</label>
+      <select class="i" id="pQue" onchange="App.infoImp()">
+        <option value="arbol">El árbol (dibujo)</option>
+        <option value="lista">La lista de todas las personas</option>
+      </select>
+      <label class="f">Título</label>
+      <input class="i" id="pTit" />
+      <label class="f">Papel</label>
+      <select class="i" id="pPapel" onchange="App.infoImp()">
+        <option value="A4">A4</option><option value="Carta">Carta</option>
+        <option value="Oficio">Oficio (216×330 mm)</option><option value="A3">A3 (297×420 mm)</option>
+        <option value="A2">A2 (420×594 mm) · imprenta</option><option value="A1">A1 (594×841 mm) · imprenta</option>
+        <option value="A0">A0 (841×1189 mm) · imprenta</option>
+      </select>
+      <label class="f">Posición de la hoja</label>
+      <select class="i" id="pOri" onchange="App.infoImp()">
+        <option value="h">Echada (horizontal)</option><option value="v">Parada (vertical)</option>
+      </select>
+      <label class="f">Tamaño del árbol</label>
+      <select class="i" id="pHojas" onchange="App.infoImp()">
+        <option value="1">Todo en 1 hoja</option>
+        <option value="2">2 hojas de ancho</option>
+        <option value="3">3 hojas de ancho</option>
+        <option value="4">4 hojas de ancho</option>
+        <option value="6">6 hojas de ancho</option>
+        <option value="8">8 hojas de ancho</option>
+        <option value="12">12 hojas de ancho</option>
+      </select>
+      <div class="chk"><input type="checkbox" id="pFotos" checked onchange="App.infoImp()" /><span>Con fotos</span></div>
+      <p class="muted" id="pInfo"></p>
+      <button class="btn block" onclick="App.imprimir()">🖨️ Imprimir con estas opciones</button>
+      <button class="btn block sec" onclick="App.bajarSVG()">Descargar imagen (SVG)</button>
+      <button class="btn block sec" onclick="App.bajarPNG()">Descargar imagen (PNG)</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== COPIAS ===== -->
+<section id="vDatos" class="view noprint">
+  <div class="wrap">
+    <div class="card">
+      <h2>💾 Copias de tu árbol</h2>
+      <p class="gran">Tu árbol <b>se guarda solo</b> en este teléfono cada vez que haces un cambio.</p>
+      <p class="muted">Pero si el teléfono se pierde o se malogra, se pierde el árbol. Por eso, <b>envía una copia</b> a un familiar o a tu correo de vez en cuando.</p>
+      <p class="muted" id="dUlt"></p>
+      <button class="btn xl block ocre" onclick="App.compartir()">📤 Enviar una copia (WhatsApp, correo…)</button>
+      <button class="btn block sec" onclick="App.exportJSON()">💾 Guardar la copia en este teléfono</button>
+      <button class="btn block sec" onclick="App.importar()">📂 Abrir una copia que me enviaron</button>
+      <input type="file" id="fImport" accept=".json,.ged,.txt,application/json,text/plain" style="display:none" onchange="App.leerArchivo(this)" />
+    </div>
+    <button class="mas" onclick="App.toggle('opDatos')">⚙️ Más opciones</button>
+    <div id="opDatos" class="oculto">
+      <div class="card">
+        <h2>Estado</h2>
+        <p class="muted" id="dEstado"></p>
+        <button class="btn block sec" onclick="App.exportGED()">Exportar GEDCOM (.ged) para otros programas</button>
+      </div>
+      <div class="card">
+        <h2>Mis árboles</h2>
+        <ul class="pl" id="dArboles"></ul>
+        <button class="btn block sec" onclick="App.nuevoArbol()">➕ Empezar otro árbol</button>
+        <button class="btn block sec" onclick="App.renombrar()">✏️ Cambiar el nombre de este árbol</button>
+        <label class="f">Orden de los apellidos al agregar parientes</label>
+        <select class="i" id="dOrden" onchange="App.orden(this.value)">
+          <option value="pm">Primero el del papá, luego el de la mamá</option>
+          <option value="mp">Primero el de la mamá, luego el del papá</option>
+        </select>
+        <p class="muted">Solo cambia lo que la app escribe por adelantado. Si alguien cambió el orden de sus apellidos, cámbialo en sus datos con el botón ⇄.</p>
+        <button class="btn block warn" onclick="App.borrarArbol()">🗑️ Borrar este árbol</button>
+      </div>
+    </div>
+    <p class="muted" style="text-align:center">Árbol Familiar v11 · funciona sin internet</p>
+  </div>
+</section>
+
+<button id="btnGuardar" class="noprint" onclick="App.guardar()">💾 GUARDAR MI AVANCE</button>
+<div id="toast" class="noprint"></div>
+
+<nav class="tabs noprint">
+  <button id="tArbol" class="on" onclick="App.tab('Arbol')"><b>🌳</b>Árbol</button>
+  <button id="tPersonas" onclick="App.tab('Personas')"><b>👨‍👩‍👧</b>Familia</button>
+  <button id="tImprimir" onclick="App.tab('Imprimir')"><b>🖨️</b>Imprimir</button>
+  <button id="tDatos" onclick="App.tab('Datos')"><b>💾</b>Copias</button>
+</nav>
+
+<div id="modal" class="noprint"><div class="sheet"><button class="x" onclick="App.cerrar()" aria-label="Cerrar">✕</button><div id="mBody"></div></div></div>
+<div id="printArea"></div>
+
+<script>
+(function () {
+'use strict';
+var App = window.App = {};
+
+/* ---------- utilidades ---------- */
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function uid(p) { return p + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+function trim(s) { return String(s == null ? '' : s).replace(/^\s+|\s+$/g, ''); }
+function yr(s) { var m = /(\d{4})/.exec(s || ''); return m ? m[1] : ''; }
+function sinTildes(s) {
+  var a = 'áàäâéèëêíìïîóòöôúùüûñç', b = 'aaaaeeeeiiiioooouuuunc', r = '', i, c, k;
+  s = String(s || '').toLowerCase();
+  for (i = 0; i < s.length; i++) { c = s.charAt(i); k = a.indexOf(c); r += k >= 0 ? b.charAt(k) : c; }
+  return r;
+}
+function corta(s, n) { s = String(s || ''); return s.length > n ? s.substr(0, n - 1) + '…' : s; }
+function r1(n) { return Math.round(n * 10) / 10; }
+function hoy() {
+  var d = new Date(), m = d.getMonth() + 1, dd = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+}
+function slug(s) { return sinTildes(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'arbol'; }
+
+/* ---------- almacenamiento ---------- */
+var IDX = null, T = null, KIDS = {};
+var BW = 170, BH = 74, GX = 18, SG = 26, VG = 60, PAD = 30, TODAS = 999;
+
+/* ST.tipo: 'idb' (IndexedDB) o 'ls' (localStorage). Todo se lee de ST.cache (en memoria);
+   las escrituras van a la caché y luego a IndexedDB en segundo plano. */
+var ST = { tipo: 'ls', db: null, cache: {}, fallo: false };
+function stIniciar(listo) {
+  var hecho = false, req;
+  function fin(tipo) {
+    if (hecho) return; hecho = true;
+    ST.tipo = tipo;
+    if (tipo === 'ls') { ST.db = null; ST.cache = {}; }
+    listo();
+  }
+  function leeLS() {
+    var o = {}, i, k;
+    try { for (i = 0; i < localStorage.length; i++) { k = localStorage.key(i); if (k && k.indexOf('agf_') === 0) o[k] = localStorage.getItem(k); } } catch (e) {}
+    return o;
+  }
+  try {
+    if (!window.indexedDB) { fin('ls'); return; }
+    req = window.indexedDB.open('arbol-familiar', 1);
+  } catch (e) { fin('ls'); return; }
+  setTimeout(function () { fin('ls'); }, 4000);
+  req.onupgradeneeded = function () { var db = req.result; if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv'); };
+  req.onerror = function () { fin('ls'); };
+  req.onblocked = function () { fin('ls'); };
+  req.onsuccess = function () {
+    if (hecho) return;
+    var db = req.result, datos = {}, tx, cur;
+    try {
+      tx = db.transaction('kv', 'readonly');
+      cur = tx.objectStore('kv').openCursor();
+    } catch (e) { fin('ls'); return; }
+    cur.onsuccess = function () {
+      var c = cur.result;
+      if (c) { datos[c.key] = c.value; c['continue'](); return; }
+      if (hecho) return;
+      ST.db = db; ST.cache = datos;
+      if (!datos.agf_index) {
+        /* primera vez con IndexedDB: copiar lo que hubiera en localStorage (no se borra de allí) */
+        var ls = leeLS(), k, n = 0;
+        for (k in ls) if (ls.hasOwnProperty(k) && k !== 'agf_test') { ST.cache[k] = ls[k]; idbPut(k, ls[k]); n++; }
+      }
+      db.onversionchange = function () { db.close(); };
+      fin('idb');
+    };
+    cur.onerror = function () { fin('ls'); };
+  };
+}
+/* cb(ok): se llama cuando IndexedDB confirma (ok=true) o falla (ok=false). Sin cb, un fallo muestra alerta. */
+function idbPut(k, v, cb) {
+  var avisado = false;
+  function mal() { if (avisado) return; avisado = true; if (cb) cb(false); else avisaFallo(); }
+  try {
+    var tx = ST.db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(v, k);
+    tx.oncomplete = function () { if (!avisado) { avisado = true; if (cb) cb(true); } };
+    tx.onerror = tx.onabort = mal;
+  } catch (e) { mal(); }
+}
+function avisaFallo() {
+  if (ST.fallo) return; ST.fallo = true;
+  alert('⚠️ El teléfono NO pudo guardar el último cambio (¿memoria llena?).\nVe a “Copias” y envía una copia ahora para no perder tu árbol.');
+  setTimeout(function () { ST.fallo = false; }, 10000);
+}
+function lsGet(k) {
+  if (ST.tipo === 'idb') return ST.cache.hasOwnProperty(k) ? ST.cache[k] : null;
+  try { return localStorage.getItem(k); } catch (e) { return null; }
+}
+/* cb(ok) opcional: con cb, quien llama decide qué mostrar si falla; sin cb, un fallo muestra alerta. */
+function lsSet(k, v, cb) {
+  if (ST.tipo === 'idb') { ST.cache[k] = v; idbPut(k, v, cb); return true; }
+  try { localStorage.setItem(k, v); if (cb) cb(true); return true; }
+  catch (e) {
+    if (cb) cb(false);
+    else alert('No se pudo guardar en este teléfono (memoria del navegador llena o modo privado).\nVe a “Copias” y envía una copia ahora.');
+    return false;
+  }
+}
+function lsDel(k) {
+  if (ST.tipo === 'idb') {
+    delete ST.cache[k];
+    try { var tx = ST.db.transaction('kv', 'readwrite'); tx.objectStore('kv')['delete'](k); } catch (e) {}
+  }
+  try { localStorage.removeItem(k); } catch (e) {}
+}
+function guardaIdx(cb) { lsSet('agf_index', JSON.stringify(IDX), cb); }
+function persist(cb) { lsSet('agf_t_' + T.id, JSON.stringify(T), cb); }
+function cambio() {
+  T.changes = (T.changes || 0) + 1; reindex();
+  persist(function (ok) { if (ok) aviso('✅ Guardado'); else avisaFallo(); });
+}
+
+function arbolVacio(id, name) {
+  return { id: id, name: name || 'Mi familia', persons: {}, focus: null, up: 3, down: 3, changes: 0, lastBackup: null, created: hoy() };
+}
+function cargaArbol(id) {
+  var t = null;
+  try { t = JSON.parse(lsGet('agf_t_' + id)); } catch (e) { t = null; }
+  if (!t || typeof t.persons !== 'object') t = arbolVacio(id);
+  t.id = id;
+  return t;
+}
+function nombreEnIdx(id) {
+  for (var i = 0; i < IDX.trees.length; i++) if (IDX.trees[i].id === id) return IDX.trees[i];
+  return null;
+}
+function iniciar() {
+  try { IDX = JSON.parse(lsGet('agf_index')); } catch (e) { IDX = null; }
+  if (!IDX || !IDX.trees) IDX = { trees: [], current: null };
+  if (!IDX.trees.length) {
+    var id = uid('t');
+    IDX.trees.push({ id: id, name: 'Mi familia' });
+    IDX.current = id;
+    T = arbolVacio(id, 'Mi familia');
+    guardaIdx(); persist();
+  } else {
+    if (!nombreEnIdx(IDX.current)) IDX.current = IDX.trees[0].id;
+    T = cargaArbol(IDX.current);
+    T.name = nombreEnIdx(IDX.current).name;
+  }
+  reindex();
+}
+
+/* ---------- personas y relaciones ---------- */
+function P(id) { return id && T.persons.hasOwnProperty(id) ? T.persons[id] : null; }
+function nombre(p) { if (!p) return '?'; return trim((trim(p.given) || '(sin nombre)') + ' ' + trim(p.surname)); }
+function anios(p) {
+  var b = yr(p.birth), d = yr(p.death);
+  if (p.dead || d) return (b || '?') + ' – ' + (d || '?') + ' †';
+  return b ? 'n. ' + b : '';
+}
+function reindex() {
+  KIDS = {};
+  var k, p;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    p = T.persons[k];
+    if (p.father && P(p.father)) (KIDS[p.father] = KIDS[p.father] || []).push(k);
+    if (p.mother && P(p.mother)) (KIDS[p.mother] = KIDS[p.mother] || []).push(k);
+  }
+}
+function otroPadre(kidId, id) {
+  var c = P(kidId);
+  if (c.father === id) return P(c.mother) ? c.mother : null;
+  if (c.mother === id) return P(c.father) ? c.father : null;
+  return null;
+}
+function parejas(id) {
+  var p = P(id), res = [], i, o, kids = KIDS[id] || [];
+  for (i = 0; i < (p.spouses || []).length; i++) if (P(p.spouses[i]) && res.indexOf(p.spouses[i]) < 0 && p.spouses[i] !== id) res.push(p.spouses[i]);
+  for (i = 0; i < kids.length; i++) { o = otroPadre(kids[i], id); if (o && res.indexOf(o) < 0) res.push(o); }
+  return res;
+}
+function hijosOrden(ids) {
+  var a = ids.slice(0);
+  a.sort(function (x, y) {
+    var bx = yr(P(x).birth) || '9999', by = yr(P(y).birth) || '9999';
+    return bx < by ? -1 : bx > by ? 1 : 0;
+  });
+  return a;
+}
+function esDescendiente(anc, target) {
+  var pila = [anc], vis = {}, id, k, i;
+  while (pila.length) {
+    id = pila.pop();
+    if (vis[id]) continue; vis[id] = true;
+    k = KIDS[id] || [];
+    for (i = 0; i < k.length; i++) { if (k[i] === target) return true; pila.push(k[i]); }
+  }
+  return false;
+}
+function hermanos(id) {
+  var p = P(id), res = [], i, lst = [];
+  if (p.father) lst = lst.concat(KIDS[p.father] || []);
+  if (p.mother) lst = lst.concat(KIDS[p.mother] || []);
+  for (i = 0; i < lst.length; i++) if (lst[i] !== id && res.indexOf(lst[i]) < 0) res.push(lst[i]);
+  return hijosOrden(res);
+}
+function ancestros(id) {
+  var res = {}, cola = [[id, 0]], it, p;
+  while (cola.length) {
+    it = cola.shift(); p = P(it[0]);
+    if (!p || it[1] > 60) continue;
+    if (p.father && P(p.father) && !res.hasOwnProperty(p.father)) { res[p.father] = it[1] + 1; cola.push([p.father, it[1] + 1]); }
+    if (p.mother && P(p.mother) && !res.hasOwnProperty(p.mother)) { res[p.mother] = it[1] + 1; cola.push([p.mother, it[1] + 1]); }
+  }
+  return res;
+}
+var GRADO = ['', 'primos hermanos', 'primos segundos', 'primos terceros', 'primos cuartos', 'primos quintos'];
+/* ¿La pareja a–b comparte algún ancestro? Devuelve {texto} o null */
+function parentesco(a, b) {
+  var A = ancestros(a), B = ancestros(b), k, mejor = 1e9, comunes = [], da = 0, db = 0, m, d, rel, i, noms = [];
+  if (A.hasOwnProperty(b) || B.hasOwnProperty(a)) return { texto: nombre(P(a)) + ' y ' + nombre(P(b)) + ' figuran como ascendiente y descendiente. Revisa los datos.' };
+  for (k in A) if (A.hasOwnProperty(k) && B.hasOwnProperty(k)) {
+    if (A[k] + B[k] < mejor) { mejor = A[k] + B[k]; comunes = [k]; da = A[k]; db = B[k]; }
+    else if (A[k] + B[k] === mejor) comunes.push(k);
+  }
+  if (!comunes.length) return null;
+  m = Math.min(da, db); d = Math.abs(da - db);
+  if (m === 1 && d === 0) rel = 'hermanos';
+  else if (m === 1) rel = 'parientes directos (uno es ' + (d === 1 ? 'tío o tía' : 'tío o tía abuelo/a') + ' del otro)';
+  else rel = (GRADO[m - 1] || ('primos en grado ' + (m - 1))) + (d ? ' con ' + d + ' generación' + (d > 1 ? 'es' : '') + ' de diferencia' : '');
+  for (i = 0; i < comunes.length && i < 2; i++) noms.push(nombre(P(comunes[i])));
+  return { texto: nombre(P(a)) + ' y ' + nombre(P(b)) + ' son ' + rel + ' (ancestro común: ' + noms.join(' y ') + ').' };
+}
+function nuevaPersona(d) {
+  var id = uid('p');
+  var p = { id: id, given: '', surname: '', sex: 'U', birth: '', birthPlace: '', death: '', deathPlace: '', dead: false, notes: '', photo: '', father: null, mother: null, spouses: [] };
+  for (var k in d) if (d.hasOwnProperty(k) && p.hasOwnProperty(k)) p[k] = d[k];
+  T.persons[id] = p;
+  return p;
+}
+function unirParejas(a, b) {
+  if (a === b) return;
+  var pa = P(a), pb = P(b);
+  if (!pa || !pb) return;
+  pa.spouses = pa.spouses || []; pb.spouses = pb.spouses || [];
+  if (pa.spouses.indexOf(b) < 0) pa.spouses.push(b);
+  if (pb.spouses.indexOf(a) < 0) pb.spouses.push(a);
+}
+/* rol: 'father' | 'mother' — valida que no se formen ciclos */
+function ponerPadre(hijoId, padreId, rol) {
+  if (hijoId === padreId) { alert('Una persona no puede ser su propio padre o madre.'); return false; }
+  if (esDescendiente(hijoId, padreId)) { alert(nombre(P(padreId)) + ' es descendiente de ' + nombre(P(hijoId)) + '. No puede ser su padre o madre.'); return false; }
+  var h = P(hijoId), otro = rol === 'father' ? 'mother' : 'father';
+  if (h[otro] === padreId) { alert('Esa persona ya figura como ' + (otro === 'father' ? 'padre' : 'madre') + '.'); return false; }
+  if (h[rol] && h[rol] !== padreId && P(h[rol])) {
+    if (!confirm(nombre(h) + ' ya tiene ' + (rol === 'father' ? 'padre' : 'madre') + ': ' + nombre(P(h[rol])) + '.\n¿Reemplazarlo?')) return false;
+  }
+  h[rol] = padreId;
+  return true;
+}
+/* coloca a "a" y "b" como padre y madre de un hijo según el sexo registrado */
+function rolesDe(aId, bId) {
+  var a = P(aId), b = bId ? P(bId) : null;
+  if (a.sex === 'F') return { father: bId || null, mother: aId };
+  if (a.sex === 'M') return { father: aId, mother: bId || null };
+  if (b && b.sex === 'M') return { father: bId, mother: aId };
+  return { father: aId, mother: bId || null };
+}
+
+/* ---------- diseño del árbol ---------- */
+function anchoUnidad(n) { return n * BW + (n - 1) * GX; }
+
+function armaDesc(id, depth, maxD, visto) {
+  var n = { id: id, unit: [id], pi: 0, groups: [], dup: false, w: BW, kidsW: 0 };
+  if (visto[id]) { n.dup = true; return n; }
+  visto[id] = true;
+  var ps = parejas(id), izq = null, der, i, j, g, kids, orden, cnt = 0, suma = 0;
+  if (ps.length > 1) { izq = ps[1]; der = [ps[0]].concat(ps.slice(2)); } else der = ps.slice(0);
+  n.unit = (izq ? [izq] : []).concat([id], der);
+  n.pi = izq ? 1 : 0;
+  for (i = 0; i < ps.length; i++) visto[ps[i]] = true;
+  if (depth < maxD) {
+    kids = hijosOrden(KIDS[id] || []);
+    orden = (izq ? [izq] : []).concat([null], der);
+    for (i = 0; i < orden.length; i++) {
+      g = [];
+      for (j = 0; j < kids.length; j++) if (otroPadre(kids[j], id) === orden[i]) g.push(armaDesc(kids[j], depth + 1, maxD, visto));
+      if (g.length) n.groups.push({ partner: orden[i], kids: g });
+    }
+  }
+  for (i = 0; i < n.groups.length; i++) for (j = 0; j < n.groups[i].kids.length; j++) { suma += n.groups[i].kids[j].w; cnt++; }
+  n.kidsW = cnt ? suma + (cnt - 1) * SG : 0;
+  n.w = Math.max(anchoUnidad(n.unit.length), n.kidsW);
+  return n;
+}
+function linea(out, x1, y1, x2, y2, punteada) { (punteada ? out.dlines : out.lines).push('M' + r1(x1) + ' ' + r1(y1) + 'L' + r1(x2) + ' ' + r1(y2)); }
+
+function ubicaDesc(n, x, y, out) {
+  var uw = anchoUnidad(n.unit.length), ux = x + (n.w - uw) / 2, pos = [], i, j, g, px;
+  for (i = 0; i < n.unit.length; i++) {
+    pos.push(ux + i * (BW + GX));
+    out.boxes.push({ id: n.unit[i], x: pos[i], y: y, dup: n.dup && i === n.pi });
+  }
+  px = pos[n.pi];
+  for (i = 0; i < n.unit.length; i++) if (i !== n.pi) out.couples.push([n.id, n.unit[i]]);
+  if (n.pi === 1) linea(out, pos[0] + BW, y + BH / 2, px, y + BH / 2);
+  if (n.unit.length > n.pi + 1) linea(out, px + BW, y + BH / 2, pos[n.pi + 1], y + BH / 2);
+  /* 3.ª pareja o más: línea por encima de las casillas, desde la persona hasta esa pareja */
+  for (i = n.pi + 2; i < n.unit.length; i++) {
+    var sx = px + BW - 14 - 8 * (i - n.pi - 2), sy = y - 10 - 6 * (i - n.pi - 2), ex = pos[i] + BW / 2;
+    linea(out, sx, y, sx, sy); linea(out, sx, sy, ex, sy); linea(out, ex, sy, ex, y);
+  }
+  if (!n.groups.length) return px;
+  var kx = x + (n.w - n.kidsW) / 2, ky = y + BH + VG, ng = n.groups.length;
+  for (i = 0; i < ng; i++) {
+    g = n.groups[i];
+    var pIdx = g.partner === null ? -1 : n.unit.indexOf(g.partner), dx, dy;
+    if (pIdx < 0) { dx = px + BW / 2; dy = y + BH; }
+    else if (pIdx === n.pi - 1) { dx = pos[pIdx] + BW + GX / 2; dy = y + BH / 2; }
+    else if (pIdx === n.pi + 1) { dx = px + BW + GX / 2; dy = y + BH / 2; }
+    else { dx = pos[pIdx] + BW / 2; dy = y + BH; }
+    var barY = y + BH + VG * (i + 1) / (ng + 1), cs = [], mn = dx, mx = dx, c;
+    for (j = 0; j < g.kids.length; j++) {
+      c = ubicaDesc(g.kids[j], kx, ky, out) + BW / 2;
+      cs.push(c); if (c < mn) mn = c; if (c > mx) mx = c;
+      kx += g.kids[j].w + SG;
+    }
+    linea(out, dx, dy, dx, barY);
+    if (mx > mn) linea(out, mn, barY, mx, barY);
+    for (j = 0; j < cs.length; j++) linea(out, cs[j], barY, cs[j], ky);
+  }
+  return px;
+}
+function armaAnc(id, depth, maxD, camino) {
+  var n = { id: id, f: null, m: null, w: BW }, p = P(id), cw;
+  if (depth >= maxD) return n;
+  camino[id] = true;
+  if (p.father && P(p.father) && !camino[p.father]) n.f = armaAnc(p.father, depth + 1, maxD, camino);
+  if (p.mother && P(p.mother) && !camino[p.mother]) n.m = armaAnc(p.mother, depth + 1, maxD, camino);
+  delete camino[id];
+  cw = n.f && n.m ? n.f.w + SG + n.m.w : (n.f ? n.f.w : (n.m ? n.m.w : 0));
+  n.w = Math.max(BW, cw);
+  return n;
+}
+function ubicaAnc(n, x, y, out, dibujar) {
+  var cx = x + n.w / 2, ps = [], i, tw, px, py, cs = [], bar, mx;
+  if (dibujar) out.boxes.push({ id: n.id, x: cx - BW / 2, y: y });
+  if (n.f) ps.push(n.f); if (n.m) ps.push(n.m);
+  if (!ps.length) return;
+  tw = ps.length === 2 ? ps[0].w + SG + ps[1].w : ps[0].w;
+  px = x + (n.w - tw) / 2; py = y - VG - BH;
+  for (i = 0; i < ps.length; i++) { ubicaAnc(ps[i], px, py, out, true); cs.push(px + ps[i].w / 2); px += ps[i].w + SG; }
+  bar = y - VG / 2;
+  if (ps.length === 2) {
+    out.couples.push([ps[0].id, ps[1].id]);
+    linea(out, cs[0] + BW / 2, py + BH / 2, cs[1] - BW / 2, py + BH / 2);
+    mx = (cs[0] + cs[1]) / 2;
+    linea(out, mx, py + BH / 2, mx, bar);
+  } else { mx = cs[0]; linea(out, mx, py + BH, mx, bar); }
+  if (mx !== cx) linea(out, Math.min(mx, cx), bar, Math.max(mx, cx), bar);
+  linea(out, cx, bar, cx, y);
+}
+/* ¿medio hermano? comparten solo el papá o solo la mamá (ambos conocidos y distintos) */
+function esMedio(a, b) {
+  var p = P(a), q = P(b);
+  return !!((p.father && q.father && p.father !== q.father) || (p.mother && q.mother && p.mother !== q.mother));
+}
+/* Hermanos de la persona central en la fila 0: mayores a la izquierda, menores a la derecha.
+   Solo la casilla de cada hermano (su familia se ve al tocarlo y elegir “Verlo en el árbol”). */
+function soloMedios(ids, medio) {
+  var r = [], i;
+  for (i = 0; i < ids.length; i++) if (esMedio(ids[i], T.focus) === medio) r.push(ids[i]);
+  return r;
+}
+function ubicaHermanos(d, fx, out) {
+  var sib = hermanos(T.focus), todos, pos, i, id, x, izq = [], der = [], c, bar = -VG / 2, mn = fx, mx = fx, medios = [], hay = false;
+  for (i = sib.length - 1; i >= 0; i--) if (d.unit.indexOf(sib[i]) >= 0) sib.splice(i, 1);
+  if (!sib.length) return;
+  todos = hijosOrden(sib.concat([T.focus])); pos = todos.indexOf(T.focus);
+  for (i = 0; i < todos.length; i++) if (todos[i] !== T.focus) (i < pos ? izq : der).push(todos[i]);
+  /* medios hermanos a los extremos, para que la línea continua no pase sobre ellos */
+  izq = soloMedios(izq, true).concat(soloMedios(izq, false));
+  der = soloMedios(der, false).concat(soloMedios(der, true));
+  var ux = (d.w - anchoUnidad(d.unit.length)) / 2, uw = anchoUnidad(d.unit.length);
+  x = ux - SG - BW;
+  for (i = izq.length - 1; i >= 0; i--) { out.boxes.push({ id: izq[i], x: x, y: 0 }); izq[i] = [izq[i], x + BW / 2]; x -= BW + SG; }
+  x = ux + uw + SG;
+  for (i = 0; i < der.length; i++) { out.boxes.push({ id: der[i], x: x, y: 0 }); der[i] = [der[i], x + BW / 2]; x += BW + SG; }
+  todos = izq.concat(der);
+  for (i = 0; i < todos.length; i++) {
+    id = todos[i][0]; c = todos[i][1];
+    if (esMedio(id, T.focus)) { medios.push(c); continue; }
+    linea(out, c, bar, c, 0); if (c < mn) mn = c; if (c > mx) mx = c;
+  }
+  if (mx > mn) linea(out, mn, bar, mx, bar);
+  linea(out, fx, bar, fx, 0);
+  for (i = 0; i < medios.length; i++) {
+    c = medios[i]; hay = true;
+    linea(out, c, bar, c, 0, true);
+    linea(out, c < mn ? c : mx, bar, c < mn ? mn : c, bar, true);
+  }
+  if (hay) out.medios = true;
+}
+function disenar() {
+  var out = { boxes: [], lines: [], dlines: [], couples: [], notas: [] }, d, a, fx, i, b;
+  d = armaDesc(T.focus, 0, T.down, {});
+  fx = ubicaDesc(d, 0, 0, out) + BW / 2;
+  if (T.up > 0) { a = armaAnc(T.focus, 0, T.up, {}); ubicaAnc(a, fx - a.w / 2, 0, out, false); }
+  ubicaHermanos(d, fx, out);
+  var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (i = 0; i < out.boxes.length; i++) {
+    b = out.boxes[i];
+    if (b.id === T.focus && b.y === 0 && Math.abs(b.x + BW / 2 - fx) < 1) b.focus = true;
+    if (b.x < x0) x0 = b.x; if (b.y < y0) y0 = b.y;
+    if (b.x + BW > x1) x1 = b.x + BW; if (b.y + BH > y1) y1 = b.y + BH;
+  }
+  /* notas: parejas emparentadas y personas repetidas */
+  var visto = {}, marca = {}, c, pr, key, hayDup = false, largo = 0;
+  for (i = 0; i < out.couples.length; i++) {
+    c = out.couples[i]; key = [c[0], c[1]].sort().join('|');
+    if (visto[key]) continue; visto[key] = true;
+    pr = parentesco(c[0], c[1]);
+    if (pr) { out.notas.push('(' + (out.notas.length + 1) + ') ' + pr.texto); marca[c[0]] = marca[c[1]] = '(' + out.notas.length + ')'; }
+  }
+  for (i = 0; i < out.boxes.length; i++) { b = out.boxes[i]; if (marca[b.id]) b.nota = marca[b.id]; if (b.dup) hayDup = true; }
+  if (hayDup) out.notas.push('↻ = esta persona ya aparece en otra parte del árbol; su descendencia se dibuja allí.');
+  if (out.medios) out.notas.push('- - - = medio hermano o hermana (comparten solo el papá o solo la mamá).');
+  if (out.notas.length) out.notas.unshift('Notas:');
+  for (i = 0; i < out.notas.length; i++) if (out.notas[i].length > largo) largo = out.notas[i].length;
+  out.notaY = y1 + 34;
+  if (out.notas.length) { y1 += 20 + out.notas.length * 18; x1 = Math.max(x1, x0 + largo * 6.6); }
+  out.x = x0 - PAD; out.y = y0 - PAD; out.w = x1 - x0 + 2 * PAD; out.h = y1 - y0 + 2 * PAD;
+  out.nx = x0;
+  out.fx = fx;
+  return out;
+}
+function cajaSVG(b, fotos) {
+  var p = P(b.id); if (!p) return '';
+  var fill = p.sex === 'M' ? '#E3EEF9' : p.sex === 'F' ? '#FBE4EA' : '#EFEFEF';
+  var st = p.sex === 'M' ? '#3E7CB1' : p.sex === 'F' ? '#B8456E' : '#888888', sw = 1.5, tx = 10, mc = 20;
+  if (b.focus) { st = '#C9892B'; sw = 4; }
+  var s = '<g data-id="' + p.id + '" transform="translate(' + r1(b.x) + ',' + r1(b.y) + ')">';
+  s += '<rect width="' + BW + '" height="' + BH + '" rx="10" ry="10" fill="' + fill + '" stroke="' + st + '" stroke-width="' + sw + '"' + (b.dup ? ' stroke-dasharray="6,4"' : '') + '/>';
+  if (fotos && p.photo) {
+    s += '<image x="7" y="' + ((BH - 56) / 2) + '" width="56" height="56" preserveAspectRatio="xMidYMid slice" xlink:href="' + p.photo + '"/>';
+    tx = 70; mc = 13;
+  }
+  if (b.nota) mc -= 4;
+  s += '<text x="' + tx + '" y="25" font-size="14" font-weight="bold" fill="#1F1B16">' + esc(corta(trim(p.given) || '(sin nombre)', mc)) + '</text>';
+  s += '<text x="' + tx + '" y="44" font-size="13" fill="#1F1B16">' + esc(corta(p.surname, mc + 1)) + '</text>';
+  s += '<text x="' + tx + '" y="63" font-size="12" fill="#5A5247">' + esc(anios(p)) + '</text>';
+  if (b.dup) s += '<text x="' + (BW - 8) + '" y="64" font-size="13" text-anchor="end" fill="#8C8577">↻</text>';
+  if (b.nota) s += '<text x="' + (BW - 7) + '" y="17" font-size="11" font-weight="bold" text-anchor="end" fill="#A33B2B">⚠' + b.nota + '</text>';
+  return s + '</g>';
+}
+function interiorSVG(out, fotos) {
+  var s = '', i;
+  if (out.lines.length) s += '<path d="' + out.lines.join('') + '" fill="none" stroke="#6F675C" stroke-width="1.6"/>';
+  if (out.dlines && out.dlines.length) s += '<path d="' + out.dlines.join('') + '" fill="none" stroke="#6F675C" stroke-width="1.6" stroke-dasharray="6,4"/>';
+  for (i = 0; i < out.boxes.length; i++) s += cajaSVG(out.boxes[i], fotos);
+  for (i = 0; i < out.notas.length; i++) s += '<text x="' + r1(out.nx) + '" y="' + r1(out.notaY + i * 18) + '" font-size="12"' + (i ? '' : ' font-weight="bold"') + ' fill="#5A5247">' + esc(out.notas[i]) + '</text>';
+  return s;
+}
+function docSVG(inner, vb, w, h, extra) {
+  return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="' + vb + '" width="' + w + '" height="' + h + '" font-family="Helvetica, Arial, sans-serif"' + (extra || '') + '>' + inner + '</svg>';
+}
+
+/* ---------- vista Árbol ---------- */
+var ZOOM = 1.2, ULT = null;
+function llenaGens() {
+  var su = $('selUp'), sd = $('selDown'), h = '', i;
+  for (i = 0; i <= 10; i++) h += '<option value="' + i + '">' + i + '</option>';
+  h += '<option value="' + TODAS + '">Todas</option>';
+  su.innerHTML = h; sd.innerHTML = h;
+}
+function altoLienzo() {
+  var l = $('lienzo'), top = l.getBoundingClientRect().top, abajo = 0, n = document.getElementsByTagName('nav')[0];
+  abajo = ($('btnGuardar').offsetHeight || 0) + (n ? n.offsetHeight : 0);
+  l.style.height = Math.max(140, window.innerHeight - top - abajo - 4) + 'px';
+}
+function focoValido() {
+  if (P(T.focus)) return true;
+  for (var k in T.persons) if (T.persons.hasOwnProperty(k)) { T.focus = k; return true; }
+  T.focus = null; return false;
+}
+function pintaArbol(centrar) {
+  $('hTitulo').innerHTML = esc(T.name) + ' <span style="font-size:.75em">✏️</span>';
+  $('selUp').value = String(T.up); $('selDown').value = String(T.down);
+  avisoCopia();
+  var l = $('lienzo');
+  if (!focoValido()) {
+    $('avisoRep').innerHTML = '';
+    $('focNom').innerHTML = 'Árbol vacío';
+    l.innerHTML = '<div class="vacio"><div class="big">🌱</div><p class="gran"><b>¡Empecemos!</b><br>Primero anota a una persona, por ejemplo a ti. Después agregas a su papá, su mamá, sus hijos…</p><button class="btn xl" onclick="App.nueva()">➕ Anotar a la primera persona</button></div>';
+    altoLienzo(); ULT = null; return;
+  }
+  $('focNom').innerHTML = '👤 ' + esc(nombre(P(T.focus)));
+  var out = disenar();
+  ULT = out;
+  l.innerHTML = docSVG(interiorSVG(out, true), out.x + ' ' + out.y + ' ' + out.w + ' ' + out.h, r1(out.w * ZOOM), r1(out.h * ZOOM));
+  altoLienzo();
+  avisoRepetidos(out);
+  if (centrar) centraFoco();
+}
+function centraFoco() {
+  if (!ULT) return;
+  var l = $('lienzo');
+  l.scrollLeft = Math.max(0, (ULT.fx - ULT.x) * ZOOM - l.clientWidth / 2);
+  l.scrollTop = Math.max(0, (0 - ULT.y + BH / 2) * ZOOM - l.clientHeight / 2);
+}
+App.zoom = function (d) {
+  if (!ULT) return;
+  var l = $('lienzo'), svg = l.getElementsByTagName('svg')[0];
+  var cx = (l.scrollLeft + l.clientWidth / 2) / ZOOM, cy = (l.scrollTop + l.clientHeight / 2) / ZOOM;
+  if (d === 0) ZOOM = Math.min(1, l.clientWidth / ULT.w, l.clientHeight / ULT.h);
+  else ZOOM = Math.max(0.05, Math.min(3, ZOOM * (d > 0 ? 1.25 : 0.8)));
+  svg.setAttribute('width', r1(ULT.w * ZOOM)); svg.setAttribute('height', r1(ULT.h * ZOOM));
+  if (d === 0) { l.scrollLeft = 0; l.scrollTop = 0; }
+  else { l.scrollLeft = cx * ZOOM - l.clientWidth / 2; l.scrollTop = cy * ZOOM - l.clientHeight / 2; }
+};
+App.gens = function () {
+  T.up = parseInt($('selUp').value, 10); T.down = parseInt($('selDown').value, 10);
+  persist(); pintaArbol(true);
+};
+App.raiz = function () {
+  if (!focoValido()) return;
+  var id = T.focus, vis = {}, p;
+  while (!vis[id]) {
+    vis[id] = true; p = P(id);
+    if (p.father && P(p.father)) id = p.father;
+    else if (p.mother && P(p.mother)) id = p.mother;
+    else break;
+  }
+  T.focus = id; T.up = 0; T.down = TODAS; persist();
+  ZOOM = 1.2; pintaArbol(false);
+  App.zoom(0);
+};
+App.centrar = function (id) { T.focus = id; persist(); App.cerrar(); App.tab('Arbol'); pintaArbol(true); };
+function avisoCopia() {
+  var n = T.changes || 0, a = $('avisoBackup');
+  a.innerHTML = n >= 15 ? '<div class="aviso">⚠️ Hiciste muchos cambios y no has enviado una copia. <a href="#" onclick="App.compartir();return false"><b>📤 Enviar copia ahora</b></a></div>' : '';
+}
+$('lienzo').onclick = function (e) {
+  var el = e.target || e.srcElement;
+  while (el && el !== this) {
+    if (el.getAttribute && el.getAttribute('data-id')) { App.ver(el.getAttribute('data-id')); return; }
+    el = el.parentNode;
+  }
+};
+
+/* ---------- pestañas ---------- */
+App.tab = function (t) {
+  var v = ['Arbol', 'Personas', 'Imprimir', 'Datos'], i;
+  for (i = 0; i < v.length; i++) {
+    $('v' + v[i]).className = 'view noprint' + (v[i] === t ? ' on' : '');
+    $('t' + v[i]).className = v[i] === t ? 'on' : '';
+  }
+  window.scrollTo(0, 0);
+  if (t === 'Arbol') pintaArbol(true);
+  if (t === 'Personas') App.lista();
+  if (t === 'Imprimir') { if (!trim($('pTit').value)) $('pTit').value = 'Árbol familiar — ' + T.name; App.infoImp(); }
+  if (t === 'Datos') pintaDatos();
+};
+
+/* ---------- lista de personas ---------- */
+function ordenadas() {
+  var a = [], k;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) a.push(T.persons[k]);
+  a.sort(function (x, y) {
+    var ax = sinTildes(x.surname + ' ' + x.given), ay = sinTildes(y.surname + ' ' + y.given);
+    return ax < ay ? -1 : ax > ay ? 1 : 0;
+  });
+  return a;
+}
+function avatar(p) {
+  if (p.photo) return '<div class="av"><img src="' + p.photo + '" alt=""/></div>';
+  var ini = (trim(p.given).charAt(0) + trim(p.surname).charAt(0)).toUpperCase() || '?';
+  return '<div class="av ' + (p.sex || 'U') + '">' + esc(ini) + '</div>';
+}
+App.lista = function () {
+  var q = sinTildes(trim($('busca').value)), a = ordenadas(), h = '', n = 0, i, p, tot = a.length, MAX = 300;
+  for (i = 0; i < a.length; i++) {
+    p = a[i];
+    if (q && sinTildes(p.given + ' ' + p.surname + ' ' + p.surname + ' ' + p.given).indexOf(q) < 0) continue;
+    n++;
+    if (n > MAX) continue;
+    h += '<li onclick="App.ver(\'' + p.id + '\')">' + avatar(p) + '<div><div class="nm">' + esc(nombre(p)) + '</div><div class="muted">' + esc(anios(p)) + '</div></div></li>';
+  }
+  $('listaP').innerHTML = h || '<li class="muted">No hay personas' + (q ? ' con ese nombre' : ' todavía') + '.</li>';
+  $('cuenta').innerHTML = tot + ' persona' + (tot === 1 ? '' : 's') + ' en este árbol' + (q ? ' · ' + n + ' encontrada' + (n === 1 ? '' : 's') : '') + (n > MAX ? ' · mostrando ' + MAX + ', escribe más para filtrar' : '');
+};
+
+/* ---------- modal ---------- */
+var ABIERTO = 0;
+function abre(html) { $('mBody').innerHTML = html; $('modal').style.display = 'block'; $('modal').scrollTop = 0; ABIERTO = new Date().getTime(); }
+App.cerrar = function () { $('modal').style.display = 'none'; $('mBody').innerHTML = ''; };
+/* tocar fuera cierra, pero no en el primer segundo (evita que un doble toque abra y cierre de golpe) */
+$('modal').onclick = function (e) { if ((e.target || e.srcElement) === this && new Date().getTime() - ABIERTO > 1000) App.cerrar(); };
+function refrescar() {
+  if ($('vArbol').className.indexOf(' on') >= 0) pintaArbol(false);
+  if ($('vPersonas').className.indexOf(' on') >= 0) App.lista();
+}
+
+/* ---------- ficha de persona (versión fácil) ---------- */
+function etiqueta(id, tipo) {
+  var s = P(id).sex;
+  if (tipo === 'father') return 'Papá';
+  if (tipo === 'mother') return 'Mamá';
+  if (tipo === 'spouse') return s === 'M' ? 'Esposo' : s === 'F' ? 'Esposa' : 'Pareja';
+  if (tipo === 'child') return s === 'F' ? 'Hija' : s === 'M' ? 'Hijo' : 'Hijo/a';
+  return s === 'F' ? 'Hermana' : s === 'M' ? 'Hermano' : 'Hermano/a';
+}
+function filaFam(id, tipo) {
+  var p = P(id);
+  return '<div class="rel" onclick="App.ver(\'' + id + '\')"><div class="lab">' + etiqueta(id, tipo) + '</div><div class="val">' + esc(nombre(p)) + (anios(p) ? ' <span>' + esc(anios(p)) + '</span>' : '') + '</div><div style="font-size:26px;color:#8C8577">›</div></div>';
+}
+function filaQuitar(id, tipo, rid) {
+  return '<div class="rel" style="cursor:default"><div class="val" style="color:#1F1B16">' + etiqueta(rid, tipo) + ': ' + esc(nombre(P(rid))) + '</div><button class="btn sm sec" onclick="App.quita(\'' + id + '\',\'' + tipo + '\',\'' + rid + '\')">Quitar</button></div>';
+}
+App.toggle = function (id) { var e = $(id); e.className = e.className.indexOf('oculto') >= 0 ? e.className.replace(/\s*oculto/, '') : e.className + ' oculto'; };
+App.ver = function (id) {
+  var p = P(id); if (!p) return;
+  var h = '', i, ps = parejas(id), kids = hijosOrden(KIDS[id] || []), sib = hermanos(id), fam = '', q = '', pr, lug;
+  h += p.photo ? '<img class="foto" src="' + p.photo + '" alt=""/>' : '';
+  h += '<h3>' + esc(nombre(p)) + '</h3>';
+  h += '<p class="gran" style="margin:0 0 10px">';
+  if (p.birth || p.birthPlace) h += '👶 Nació' + (p.birth ? ' el ' + esc(p.birth) : '') + (p.birthPlace ? ' en ' + esc(p.birthPlace) : '') + '<br>';
+  if (p.dead || p.death || p.deathPlace) h += '🕊️ Falleció' + (p.death ? ' el ' + esc(p.death) : '') + (p.deathPlace ? ' en ' + esc(p.deathPlace) : '') + '<br>';
+  h += '</p>';
+  if (p.notes) h += '<div class="card" style="white-space:pre-wrap">' + esc(p.notes) + '</div>';
+  for (i = 0; i < ps.length; i++) { pr = parentesco(id, ps[i]); if (pr) h += '<div class="aviso" style="margin:0 0 12px">⚠️ Nota: ' + esc(pr.texto) + '</div>'; }
+  var rp = repDe(id);
+  if (rp.length) h += '<div class="aviso" style="margin:0 0 12px">⚠️ Hay otra persona anotada con el mismo nombre. ¿Es la misma?<button class="btn block" style="margin-top:10px" onclick="App.revisaRep(\'' + id + '\',\'' + rp[0] + '\')">👥 Revisar y juntarlas</button></div>';
+  h += '<button class="btn block" onclick="App.centrar(\'' + id + '\')">🌳 Verlo en el árbol</button>';
+  h += '<button class="btn block sec" onclick="App.editar(\'' + id + '\')">✏️ Cambiar sus datos</button>';
+
+  if (P(p.father)) { fam += filaFam(p.father, 'father'); q += filaQuitar(id, 'father', p.father); }
+  if (P(p.mother)) { fam += filaFam(p.mother, 'mother'); q += filaQuitar(id, 'mother', p.mother); }
+  for (i = 0; i < ps.length; i++) { fam += filaFam(ps[i], 'spouse'); q += filaQuitar(id, 'spouse', ps[i]); }
+  for (i = 0; i < kids.length; i++) { fam += filaFam(kids[i], 'child'); q += filaQuitar(id, 'child', kids[i]); }
+  for (i = 0; i < sib.length; i++) fam += filaFam(sib[i], 'sibling');
+  h += '<div class="card" style="margin-top:14px"><h2>👨‍👩‍👧 Su familia</h2>' + (fam || '<p class="muted" style="margin:0">Todavía no hay familiares. Agrégalos abajo.</p>') + '</div>';
+
+  h += '<div class="card"><h2>➕ Agregar familia</h2>';
+  if (!P(p.father)) h += '<button class="btn block sec izq" onclick="App.agrega(\'' + id + '\',\'father\')">👨 Su papá</button>';
+  if (!P(p.mother)) h += '<button class="btn block sec izq" onclick="App.agrega(\'' + id + '\',\'mother\')">👩 Su mamá</button>';
+  h += '<button class="btn block sec izq" onclick="App.agrega(\'' + id + '\',\'spouse\')">💑 Su esposo o esposa</button>';
+  h += '<button class="btn block sec izq" onclick="App.agrega(\'' + id + '\',\'child\')">👶 Un hijo o hija</button>';
+  h += '<button class="btn block sec izq" onclick="App.agrega(\'' + id + '\',\'sibling\')">🧑‍🤝‍🧑 Un hermano o hermana</button>';
+  h += '</div>';
+
+  h += '<button class="mas" onclick="App.toggle(\'opFicha\')">⚙️ Más opciones</button><div id="opFicha" class="oculto">';
+  if (q) h += '<div class="card"><h2>Quitar un familiar equivocado</h2><p class="muted">No se borra a la persona; solo se quita el lazo.</p>' + q + '</div>';
+  h += '<button class="btn block sec izq" onclick="App.unirBusca(\'' + id + '\')">👥 Es la misma persona que otra ya anotada</button>';
+  h += '<button class="btn block warn" onclick="App.borrar(\'' + id + '\')">🗑️ Borrar a esta persona del árbol</button></div>';
+  abre(h);
+};
+/* ---------- unir a dos personas que en realidad son la misma ---------- */
+var UNE = null;
+App.unirBusca = function (id) {
+  UNE = id;
+  var h = '<h3>👥 ¿Quién es la misma persona que ' + esc(nombre(P(id))) + '?</h3>';
+  h += '<p class="muted">Pasa cuando alguien se anotó dos veces. Se juntarán en una sola persona con todos sus datos y familiares.</p>';
+  h += '<input class="i" type="search" id="bUne" placeholder="Escribe su nombre…" oninput="App.filtraUne()" /><ul class="pl" id="lUne"></ul>';
+  abre(h);
+  $('bUne').value = trim(P(id).given);
+  App.filtraUne();
+};
+App.filtraUne = function () {
+  var q = sinTildes(trim($('bUne').value)), a = ordenadas(), h = '', i, p, n = 0;
+  for (i = 0; i < a.length && n < 100; i++) {
+    p = a[i];
+    if (p.id === UNE) continue;
+    if (q && sinTildes(p.given + ' ' + p.surname).indexOf(q) < 0) continue;
+    n++;
+    h += '<li onclick="App.unirConfirma(\'' + p.id + '\')">' + avatar(p) + '<div><div class="nm">' + esc(nombre(p)) + '</div><div class="muted">' + esc(anios(p)) + '</div></div></li>';
+  }
+  $('lUne').innerHTML = h || '<li class="muted">No encontré a nadie con ese nombre.</li>';
+};
+App.unirConfirma = function (otro) {
+  var h = '<h3>¿Juntar en una sola persona?</h3>';
+  h += '<div class="card"><p class="gran" style="margin:0">' + esc(nombre(P(UNE))) + ' <span class="muted">' + esc(anios(P(UNE))) + '</span><br>y<br>' + esc(nombre(P(otro))) + ' <span class="muted">' + esc(anios(P(otro))) + '</span></p></div>';
+  h += '<button class="btn xl block" onclick="App.unir(\'' + UNE + '\',\'' + otro + '\')">✅ Sí, es la misma persona</button>';
+  h += '<button class="btn block sec" onclick="App.ver(\'' + UNE + '\')">⬅ No, volver</button>';
+  abre(h);
+};
+/* ---------- personas repetidas: detección automática ---------- */
+function claveNom(p) { var g = sinTildes(trim(p.given)); return g ? g + '|' + sinTildes(trim(p.surname)).replace(/\s+/g, ' ') : ''; }
+function parRep(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+function ignorados() { var o = null; try { o = JSON.parse(lsGet('agf_norep_' + T.id)); } catch (e) {} return o && typeof o === 'object' ? o : {}; }
+/* otras personas con el mismo nombre y apellidos que id (sin las marcadas como distintas) */
+function repDe(id) {
+  var c = claveNom(P(id)), r = [], k, ig;
+  if (!c) return r;
+  ig = ignorados();
+  for (k in T.persons) if (T.persons.hasOwnProperty(k) && k !== id && claveNom(T.persons[k]) === c && !ig[parRep(id, k)]) r.push(k);
+  return r;
+}
+function lazos(id) { var p = P(id); return (P(p.father) ? 1 : 0) + (P(p.mother) ? 1 : 0) + parejas(id).length + (KIDS[id] || []).length; }
+function resumen(id) {
+  var p = P(id), t = [], ps = parejas(id), ks = hijosOrden(KIDS[id] || []), i, n = [];
+  for (i = 0; i < ps.length; i++) n.push(nombre(P(ps[i])));
+  if (n.length) t.push((p.sex === 'M' ? 'Esposo' : p.sex === 'F' ? 'Esposa' : 'Pareja') + ' de ' + n.join(', '));
+  n = []; for (i = 0; i < ks.length; i++) n.push(nombre(P(ks[i])));
+  if (n.length) t.push((p.sex === 'M' ? 'Papá' : p.sex === 'F' ? 'Mamá' : 'Papá/mamá') + ' de ' + n.join(', '));
+  n = []; if (P(p.father)) n.push(nombre(P(p.father))); if (P(p.mother)) n.push(nombre(P(p.mother)));
+  if (n.length) t.push((p.sex === 'F' ? 'Hija' : 'Hijo') + ' de ' + n.join(' y '));
+  return t.length ? t.join('. ') + '.' : 'Sin familiares anotados.';
+}
+function avisoRepetidos(out) {
+  var i, j, a, b, vis = {}, h = '';
+  for (i = 0; i < out.boxes.length && !h; i++) {
+    a = out.boxes[i].id; if (vis[a]) continue; vis[a] = true;
+    b = repDe(a);
+    for (j = 0; j < b.length; j++) {
+      h = '<div class="aviso" style="margin:8px 0 0">⚠️ <b>' + esc(nombre(P(a))) + '</b> está anotad' + (P(a).sex === 'M' ? 'o ' : 'a ') + (b.length + 1) + ' veces. Si es la misma persona, hay que juntarlas.' +
+          '<button class="btn block" style="margin-top:10px" onclick="App.revisaRep(\'' + a + '\',\'' + b[j] + '\')">👥 Revisar y juntarlas</button></div>';
+      break;
+    }
+  }
+  $('avisoRep').innerHTML = h;
+}
+App.revisaRep = function (a, b) {
+  var q = lazos(a) >= lazos(b) ? a : b, o = q === a ? b : a;
+  var h = '<h3>👥 ¿Es la misma persona?</h3><p class="muted">Está anotada dos veces con el mismo nombre:</p>';
+  h += '<div class="card"><p class="gran" style="margin:0"><b>1.</b> ' + esc(nombre(P(q))) + ' <span class="muted">' + esc(anios(P(q))) + '</span></p><p class="muted" style="margin:4px 0 0">' + esc(resumen(q)) + '</p></div>';
+  h += '<div class="card"><p class="gran" style="margin:0"><b>2.</b> ' + esc(nombre(P(o))) + ' <span class="muted">' + esc(anios(P(o))) + '</span></p><p class="muted" style="margin:4px 0 0">' + esc(resumen(o)) + '</p></div>';
+  h += '<button class="btn xl block" onclick="App.unir(\'' + q + '\',\'' + o + '\')">✅ Sí, es la misma: juntarlas</button>';
+  h += '<button class="btn block sec" onclick="App.noRep(\'' + q + '\',\'' + o + '\')">No, son dos personas distintas</button>';
+  abre(h);
+};
+App.noRep = function (a, b) {
+  var ig = ignorados(); ig[parRep(a, b)] = 1;
+  lsSet('agf_norep_' + T.id, JSON.stringify(ig));
+  App.cerrar(); refrescar();
+};
+/* después de juntar: hijos de sus parejas a los que les falta este papá o mamá */
+function hijosSinEste(id) {
+  var p = P(id), rol = p.sex === 'M' ? 'father' : p.sex === 'F' ? 'mother' : null, ps = parejas(id), r = [], i, j, k;
+  if (!rol) return r;
+  for (i = 0; i < ps.length; i++) {
+    k = KIDS[ps[i]] || [];
+    for (j = 0; j < k.length; j++) if (!P(P(k[j])[rol]) && r.indexOf(k[j]) < 0) r.push(k[j]);
+  }
+  return hijosOrden(r);
+}
+App.faltaHijos = function (id) {
+  var k = hijosSinEste(id), p = P(id), h, i;
+  if (!k.length) { App.ver(id); return; }
+  h = '<h3>¿' + esc(nombre(p)) + ' también es ' + (p.sex === 'M' ? 'el papá' : 'la mamá') + ' de…?</h3>';
+  h += '<p class="muted">Estos hijos de su pareja todavía no tienen ' + (p.sex === 'M' ? 'papá anotado' : 'mamá anotada') + '. Toca cada uno que sí sea.</p>';
+  for (i = 0; i < k.length; i++) h += '<button class="btn block sec izq" onclick="App.ponHijo(\'' + id + '\',\'' + k[i] + '\')">✅ ' + esc(nombre(P(k[i]))) + '</button>';
+  h += '<button class="btn xl block" onclick="App.ver(\'' + id + '\')">Listo</button>';
+  abre(h);
+};
+App.ponHijo = function (id, kid) {
+  if (!ponerPadre(kid, id, P(id).sex === 'M' ? 'father' : 'mother')) return;
+  cambio(); refrescar(); App.faltaHijos(id);
+};
+/* ---------- revisar parentesco: cruzar apellidos ---------- */
+function apeNorm(s) { return sinTildes(trim(s || '')).replace(/\s+/g, ' '); }
+function noHijo() { var o = null; try { o = JSON.parse(lsGet('agf_nohijo_' + T.id)); } catch (e) {} return o && typeof o === 'object' ? o : {}; }
+/* Propuestas {c, f, m}: c tiene los mismos apellidos que los hijos de f y m (o que el apellido
+   que les correspondería), no tiene un papá o mamá distinto y no es ya hijo de ambos.
+   solo: {f, m} opcional para limitar a una pareja. */
+/* ¿el primer apellido de este papá/mamá aparece en los apellidos de c? */
+function llevaApellido(padre, c) {
+  var a = apeNorm(primero(P(padre).surname));
+  return !a || (' ' + apeNorm(c.surname) + ' ').indexOf(' ' + a + ' ') >= 0;
+}
+function propuestas(solo) {
+  var grupos = {}, g, k, p, c, key, r = [], ya = {}, orden = [], i, ig = noHijo(), mp = T.orden === 'mp', pa, ma, ap;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    p = T.persons[k];
+    if (!P(p.father) && !P(p.mother)) continue;
+    key = (P(p.father) ? p.father : '') + '|' + (P(p.mother) ? p.mother : '');
+    g = grupos[key] || (grupos[key] = { f: P(p.father) ? p.father : null, m: P(p.mother) ? p.mother : null, ape: {} });
+    if (apeNorm(p.surname).indexOf(' ') > 0) g.ape[apeNorm(p.surname)] = 1;
+  }
+  /* primero las parejas completas: cada persona se propone una sola vez, con la opción más completa */
+  for (key in grupos) if (grupos.hasOwnProperty(key)) (grupos[key].f && grupos[key].m ? orden.unshift(key) : orden.push(key));
+  for (i = 0; i < orden.length; i++) {
+    key = orden[i]; g = grupos[key];
+    if (solo && (g.f !== solo.f || g.m !== solo.m)) continue;
+    if (g.f && g.m) {
+      pa = primero(P(g.f).surname); ma = primero(P(g.m).surname);
+      if (pa && ma) { ap = apeNorm(mp ? ma + ' ' + pa : pa + ' ' + ma); g.ape[ap] = 1; }
+    }
+    for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+      c = T.persons[k];
+      if (ya[k] || k === g.f || k === g.m || !g.ape[apeNorm(c.surname)]) continue;
+      if ((g.f && !llevaApellido(g.f, c)) || (g.m && !llevaApellido(g.m, c))) continue;
+      if ((g.f && P(c.father) && c.father !== g.f) || (g.m && P(c.mother) && c.mother !== g.m)) continue;
+      if ((!g.f || c.father === g.f) && (!g.m || c.mother === g.m)) continue;
+      if ((g.f && esDescendiente(k, g.f)) || (g.m && esDescendiente(k, g.m))) continue;
+      if ((g.f && parejas(g.f).indexOf(k) >= 0) || (g.m && parejas(g.m).indexOf(k) >= 0)) continue;
+      if (ig[k + '|' + key]) continue;
+      ya[k] = true;
+      r.push({ c: k, f: g.f, m: g.m, key: key });
+    }
+  }
+  return r;
+}
+function padresTxt(f, m) {
+  return f && m ? esc(nombre(P(f))) + ' y ' + esc(nombre(P(m))) : esc(nombre(P(f || m)));
+}
+function hermanosTxt(f, m, sin) {
+  var k = (KIDS[f || m] || []), n = [], i;
+  for (i = 0; i < k.length; i++) if (k[i] !== sin && (!f || P(k[i]).father === f) && (!m || P(k[i]).mother === m)) n.push(nombre(P(k[i])));
+  return n.length ? esc(n.join(', ')) : '';
+}
+var REVSOLO = null;
+App.revisaParentesco = function (f, m) {
+  REVSOLO = f || m ? { f: f || null, m: m || null } : null;
+  var r = propuestas(REVSOLO), h, i, x, hs, p, max = 15;
+  if (!r.length) {
+    if (REVSOLO) { REVSOLO = null; App.cerrar(); return; }
+    abre('<h3>🔎 Revisar parentesco</h3><p class="gran">No encontré a nadie más que parezca hermano o hijo por sus apellidos. ✅</p><button class="btn xl block" onclick="App.cerrar()">Listo</button>');
+    return;
+  }
+  h = '<h3>🔎 Revisar parentesco</h3><p class="muted">Estas personas tienen los mismos apellidos que los hijos de una pareja. Revisa si también son sus hijos (y hermanos de los demás).</p>';
+  for (i = 0; i < r.length && i < max; i++) {
+    x = r[i]; p = P(x.c); hs = hermanosTxt(x.f, x.m, x.c);
+    h += '<div class="card"><p class="gran" style="margin:0 0 6px">¿<b>' + esc(nombre(p)) + '</b> <span class="muted">' + esc(anios(p)) + '</span> es ' + (p.sex === 'M' ? 'hijo' : p.sex === 'F' ? 'hija' : 'hijo o hija') + ' de ' + padresTxt(x.f, x.m) + '?</p>';
+    if (hs) h += '<p class="muted" style="margin:0 0 8px">Sería ' + (p.sex === 'M' ? 'hermano' : p.sex === 'F' ? 'hermana' : 'hermano/a') + ' de: ' + hs + '</p>';
+    h += '<div class="row"><button class="btn grow" onclick="App.siHijo(\'' + x.c + '\',\'' + (x.f || '') + '\',\'' + (x.m || '') + '\')">✅ Sí</button>';
+    h += '<button class="btn grow sec" onclick="App.noEsHijo(\'' + x.c + '\',\'' + x.key + '\')">No</button></div></div>';
+  }
+  if (r.length > max) h += '<p class="muted">Hay ' + (r.length - max) + ' más; aparecerán al responder estas.</p>';
+  h += '<button class="btn block sec" onclick="App.cerrar()">Terminar después</button>';
+  abre(h);
+};
+App.siHijo = function (c, f, m) {
+  if (f && !P(P(c).father) && !ponerPadre(c, f, 'father')) return;
+  if (m && !P(P(c).mother) && !ponerPadre(c, m, 'mother')) return;
+  cambio(); refrescar(); aviso('✅ Unidos como hermanos');
+  App.revisaParentesco(REVSOLO && REVSOLO.f, REVSOLO && REVSOLO.m);
+};
+App.noEsHijo = function (c, key) {
+  var ig = noHijo(); ig[c + '|' + key] = 1;
+  lsSet('agf_nohijo_' + T.id, JSON.stringify(ig));
+  App.revisaParentesco(REVSOLO && REVSOLO.f, REVSOLO && REVSOLO.m);
+};
+/* tras agregar un hijo o hermano: revisar si hay otros con sus mismos apellidos */
+function revisaTrasAgregar(id) {
+  var p = P(id); if (!p) return false;
+  var f = P(p.father) ? p.father : null, m = P(p.mother) ? p.mother : null;
+  if (!f && !m) return false;
+  if (!propuestas({ f: f, m: m }).length) return false;
+  App.revisaParentesco(f, m);
+  return true;
+}
+function vacio(v) { return v === null || v === undefined || trim(String(v)) === ''; }
+/* junta "quita" dentro de "queda"; devuelve false si no se puede */
+function unirPersonas(queda, quita) {
+  var a = P(queda), b = P(quita), k, o, i, campos = ['given', 'surname', 'birth', 'birthPlace', 'death', 'deathPlace', 'photo'];
+  if (!a || !b || queda === quita) return false;
+  if (esDescendiente(queda, quita) || esDescendiente(quita, queda)) {
+    alert('No se pueden juntar: una de las dos figura como descendiente de la otra.'); return false;
+  }
+  for (i = 0; i < campos.length; i++) if (vacio(a[campos[i]]) && !vacio(b[campos[i]])) a[campos[i]] = b[campos[i]];
+  if ((!a.sex || a.sex === 'U') && b.sex && b.sex !== 'U') a.sex = b.sex;
+  if (b.dead) a.dead = true;
+  if (trim(b.notes) && trim(b.notes) !== trim(a.notes)) a.notes = trim(trim(a.notes) + '\n' + trim(b.notes));
+  if (!P(a.father) && P(b.father) && b.father !== queda) a.father = b.father;
+  if (!P(a.mother) && P(b.mother) && b.mother !== queda) a.mother = b.mother;
+  a.spouses = a.spouses || [];
+  for (i = 0; i < (b.spouses || []).length; i++) if (b.spouses[i] !== queda && a.spouses.indexOf(b.spouses[i]) < 0) a.spouses.push(b.spouses[i]);
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    o = T.persons[k];
+    if (o.father === quita) o.father = queda;
+    if (o.mother === quita) o.mother = queda;
+    if (o.father && o.father === o.mother) { if (a.sex === 'F') o.father = null; else o.mother = null; }
+    if (o.spouses) {
+      o.spouses = o.spouses.map(function (x) { return x === quita ? queda : x; })
+        .filter(function (x, j, arr) { return x !== k && arr.indexOf(x) === j; });
+    }
+  }
+  delete T.persons[quita];
+  if (T.focus === quita) T.focus = queda;
+  reindex();
+  return true;
+}
+App.unir = function (queda, quita) {
+  if (!unirPersonas(queda, quita)) return;
+  UNE = null;
+  cambio(); refrescar(); App.faltaHijos(queda);
+  aviso('✅ Listo: ahora es una sola persona');
+};
+App.quita = function (id, tipo, rid) {
+  var p = P(id), o = P(rid);
+  if (!confirm('¿Quitar el lazo entre ' + nombre(p) + ' y ' + nombre(o) + '?\n(No se borra a ninguna persona.)')) return;
+  if (tipo === 'father' || tipo === 'mother') p[tipo] = null;
+  else if (tipo === 'child') { if (o.father === id) o.father = null; if (o.mother === id) o.mother = null; }
+  else if (tipo === 'spouse') {
+    p.spouses = (p.spouses || []).filter(function (x) { return x !== rid; });
+    o.spouses = (o.spouses || []).filter(function (x) { return x !== id; });
+    var k = KIDS[id] || [], hay = false, i;
+    for (i = 0; i < k.length; i++) if (otroPadre(k[i], id) === rid) hay = true;
+    if (hay) alert('Tienen hijos juntos, así que seguirán apareciendo juntos. Para separarlos, quita el papá o la mamá en los datos de cada hijo.');
+  }
+  cambio(); refrescar(); App.ver(id);
+};
+App.borrar = function (id) {
+  var p = P(id), k;
+  if (!confirm('¿Borrar a ' + nombre(p) + ' del árbol?\nNo se puede deshacer.')) return;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    var o = T.persons[k];
+    if (o.father === id) o.father = null;
+    if (o.mother === id) o.mother = null;
+    if (o.spouses) o.spouses = o.spouses.filter(function (x) { return x !== id; });
+  }
+  delete T.persons[id];
+  if (T.focus === id) T.focus = p.father && P(p.father) ? p.father : (p.mother && P(p.mother) ? p.mother : null);
+  cambio(); App.cerrar(); focoValido(); refrescar();
+};
+
+/* ---------- agregar parientes ---------- */
+var PEND = null; /* {tipo, de, otro} */
+var TIT = { father: 'su papá', mother: 'su mamá', spouse: 'su esposo o esposa', child: 'un hijo o hija', sibling: 'un hermano o hermana' };
+App.agrega = function (id, tipo) {
+  var p = P(id), ps, h, i, otro, cand = [];
+  if (tipo === 'father' || tipo === 'mother') {
+    otro = tipo === 'father' ? p.mother : p.father;
+    if (P(otro)) {
+      ps = parejas(otro);
+      for (i = 0; i < ps.length; i++) if (ps[i] !== id && P(ps[i]).sex !== (tipo === 'father' ? 'F' : 'M')) cand.push(ps[i]);
+    }
+    if (cand.length) {
+      h = '<h3>' + (tipo === 'father' ? 'El papá' : 'La mamá') + ' de ' + esc(nombre(p)) + '</h3><p class="preg">¿Es alguna de estas personas?</p>';
+      for (i = 0; i < cand.length; i++) h += '<button class="btn xl block' + (i ? ' sec' : '') + '" onclick="App.esEsta(\'' + id + '\',\'' + tipo + '\',\'' + cand[i] + '\')">✅ ' + esc(nombre(P(cand[i]))) + '</button>';
+      h += '<button class="btn block sec" onclick="App.elige(\'' + id + '\',\'' + tipo + '\',\'\')">No, es otra persona</button>';
+      abre(h); return;
+    }
+  }
+  if (tipo === 'child') {
+    ps = parejas(id);
+    if (ps.length) {
+      h = '<h3>Un hijo o hija de ' + esc(nombre(p)) + '</h3><p class="preg">¿Con quién lo tuvo?</p>';
+      for (i = 0; i < ps.length; i++) h += '<button class="btn block sec izq" onclick="App.elige(\'' + id + '\',\'child\',\'' + ps[i] + '\')">con ' + esc(nombre(P(ps[i]))) + '</button>';
+      h += '<button class="btn block sec izq" onclick="App.elige(\'' + id + '\',\'child\',\'\')">Con otra persona, o no sé</button>';
+      abre(h); return;
+    }
+  }
+  if (tipo === 'sibling' && !P(p.father) && !P(p.mother)) {
+    h = '<h3>Un hermano o hermana de ' + esc(nombre(p)) + '</h3>';
+    h += '<p class="preg">No sabemos quiénes son sus papás. ¿Qué tienen en común?</p>';
+    h += '<p class="muted">Se anotará un papá o mamá “(sin nombre)” para unirlos. Si luego sabes su nombre, tócalo y cámbialo.</p>';
+    h += '<button class="btn xl block" onclick="App.elige(\'' + id + '\',\'sibling\',\'\',\'ambos\')">👨‍👩 El mismo papá y la misma mamá</button>';
+    h += '<button class="btn block sec izq" onclick="App.elige(\'' + id + '\',\'sibling\',\'\',\'father\')">👨 Solo el mismo papá</button>';
+    h += '<button class="btn block sec izq" onclick="App.elige(\'' + id + '\',\'sibling\',\'\',\'mother\')">👩 Solo la misma mamá</button>';
+    abre(h); return;
+  }
+  App.elige(id, tipo, '');
+};
+/* crear: solo para hermanos sin papás conocidos — 'ambos' | 'father' | 'mother' */
+App.elige = function (id, tipo, otro, crear) {
+  PEND = { tipo: tipo, de: id, otro: otro || null, crear: crear || null };
+  var n = 0, k; for (k in T.persons) if (T.persons.hasOwnProperty(k)) n++;
+  if (n < 2) { App.nuevaPend(); return; }
+  var h = '<h3>Agregar ' + TIT[tipo] + ' de ' + esc(nombre(P(id))) + '</h3>';
+  h += '<p class="preg">¿Ya está anotado en el árbol?</p>';
+  h += '<button class="btn xl block" onclick="App.nuevaPend()">➕ No, es alguien nuevo</button>';
+  h += '<button class="btn block sec" onclick="App.toggle(\'selExist\');$b()">🔎 Sí, ya está: buscarlo</button>';
+  h += '<div id="selExist" class="oculto"><input class="i" type="search" id="bSel" placeholder="Escribe su nombre…" oninput="App.filtraSel()" style="margin-top:12px" /><ul class="pl" id="lSel"></ul></div>';
+  abre(h);
+  App.filtraSel();
+};
+window.$b = function () { try { $('bSel').focus(); } catch (e) {} };
+App.filtraSel = function () {
+  var q = sinTildes(trim($('bSel').value)), a = ordenadas(), h = '', i, p, n = 0;
+  for (i = 0; i < a.length && n < 100; i++) {
+    p = a[i];
+    if (p.id === PEND.de || p.id === PEND.otro) continue;
+    if (q && sinTildes(p.given + ' ' + p.surname).indexOf(q) < 0) continue;
+    n++;
+    h += '<li onclick="App.tomaExistente(\'' + p.id + '\')">' + avatar(p) + '<div><div class="nm">' + esc(nombre(p)) + '</div><div class="muted">' + esc(anios(p)) + '</div></div></li>';
+  }
+  $('lSel').innerHTML = h || '<li class="muted">No encontré a nadie con ese nombre.</li>';
+};
+function aplicaPend(nid) {
+  var pe = PEND, de = P(pe.de), r;
+  if (pe.tipo === 'father' || pe.tipo === 'mother') return ponerPadre(pe.de, nid, pe.tipo);
+  if (pe.tipo === 'spouse') { unirParejas(pe.de, nid); return true; }
+  if (pe.tipo === 'child') {
+    r = rolesDe(pe.de, pe.otro);
+    if (r.father && !ponerPadre(nid, r.father, 'father')) return false;
+    if (r.mother && !ponerPadre(nid, r.mother, 'mother')) return false;
+    return true;
+  }
+  if (pe.tipo === 'sibling') {
+    if (pe.crear && !padresComunes(pe.de, nid, pe.crear)) return false;
+    if (P(de.father) && !ponerPadre(nid, de.father, 'father')) return false;
+    if (P(de.mother) && !ponerPadre(nid, de.mother, 'mother')) return false;
+    return true;
+  }
+  return false;
+}
+/* Hermanos sin papás conocidos: usa los papás que ya tenga el hermano elegido o crea
+   un papá/mamá “(sin nombre)” (persona normal, sin campos nuevos en el JSON).
+   Si algo falla, borra lo que acaba de crear. */
+function padresComunes(deId, nid, modo) {
+  var de = P(deId), nv = P(nid), roles = modo === 'ambos' ? ['father', 'mother'] : [modo];
+  var mp = T.orden === 'mp', creados = [], i, rol, pp;
+  for (i = 0; i < roles.length; i++) {
+    rol = roles[i];
+    if (P(de[rol])) continue;
+    if (P(nv[rol])) { if (!ponerPadre(deId, nv[rol], rol)) return deshaz(creados); continue; }
+    pp = nuevaPersona({
+      sex: rol === 'father' ? 'M' : 'F',
+      surname: rol === 'father' ? (mp ? segundo(de.surname) : primero(de.surname)) : (mp ? primero(de.surname) : segundo(de.surname)),
+      notes: 'Anotado sin nombre para unir a los hermanos. Si sabes su nombre, cámbialo aquí.'
+    });
+    creados.push(pp.id);
+    de[rol] = pp.id;
+  }
+  if (roles.length === 2 && creados.length === 2) unirParejas(creados[0], creados[1]);
+  reindex();
+  return true;
+  function deshaz(ids) {
+    for (var j = 0; j < ids.length; j++) {
+      if (de.father === ids[j]) de.father = null;
+      if (de.mother === ids[j]) de.mother = null;
+      delete T.persons[ids[j]];
+    }
+    reindex();
+    return false;
+  }
+}
+App.esEsta = function (id, tipo, nid) { PEND = { tipo: tipo, de: id, otro: null, crear: null }; App.tomaExistente(nid); };
+App.tomaExistente = function (nid) {
+  if (!aplicaPend(nid)) return;
+  var de = PEND.de, tipo = PEND.tipo; PEND = null;
+  cambio(); refrescar(); App.ver(de);
+  if (tipo === 'child' || tipo === 'sibling') revisaTrasAgregar(nid);
+};
+function primero(s) { return trim(s).split(/\s+/)[0] || ''; }
+function segundo(s) { return trim(s).split(/\s+/)[1] || ''; }
+App.nuevaPend = function () {
+  var pe = PEND, de = P(pe.de), pre = {}, r, pa, ma;
+  var mp = T.orden === 'mp';
+  if (pe.tipo === 'father') { pre.sex = 'M'; pre.surname = mp ? segundo(de.surname) : primero(de.surname); }
+  if (pe.tipo === 'mother') { pre.sex = 'F'; pre.surname = mp ? primero(de.surname) : segundo(de.surname); }
+  if (pe.tipo === 'spouse') { pre.sex = de.sex === 'M' ? 'F' : de.sex === 'F' ? 'M' : 'U'; }
+  if (pe.tipo === 'child') {
+    r = rolesDe(pe.de, pe.otro); pa = P(r.father); ma = P(r.mother);
+    pre.surname = mp ? trim(primero(ma ? ma.surname : '') + ' ' + primero(pa ? pa.surname : ''))
+                     : trim(primero(pa ? pa.surname : '') + ' ' + primero(ma ? ma.surname : ''));
+  }
+  if (pe.tipo === 'sibling') pre.surname = de.surname;
+  asistente(pre);
+};
+App.nueva = function () { PEND = null; asistente({}); };
+App.editar = function (id) { PEND = null; formulario(id, P(id)); };
+
+/* ---------- asistente: una pregunta por pantalla (persona nueva) ---------- */
+var W = null, FOTO = '', EDITA = null, NPASOS = 6;
+function asistente(pre) {
+  EDITA = null; FOTO = '';
+  W = { paso: 1, d: { given: '', surname: pre.surname || '', sex: pre.sex || '', birth: '', birthPlace: '', dead: false, death: '', deathPlace: '', notes: '', photo: '' }, fijoSexo: !!pre.sex };
+  pintaPaso();
+}
+function leePaso() {
+  var d = W.d;
+  if ($('wGiven')) d.given = trim($('wGiven').value);
+  if ($('fSur')) d.surname = trim($('fSur').value);
+  if ($('wBirth')) d.birth = trim($('wBirth').value);
+  if ($('wBPlace')) d.birthPlace = trim($('wBPlace').value);
+  if ($('wDeath')) d.death = trim($('wDeath').value);
+  if ($('wDPlace')) d.deathPlace = trim($('wDPlace').value);
+}
+function pintaPaso() {
+  var d = W.d, n = W.paso, h = '', i, quien = PEND ? TIT[PEND.tipo] + ' de ' + nombre(P(PEND.de)) : 'una persona nueva';
+  h += '<p class="paso">PASO ' + n + ' DE ' + NPASOS + ' · ' + esc(quien).toUpperCase() + '</p><div class="puntos">';
+  for (i = 1; i <= NPASOS; i++) h += '<i' + (i <= n ? ' class="on"' : '') + '></i>';
+  h += '</div>';
+  if (n === 1) {
+    h += '<p class="preg">¿Cómo se llama?</p><p class="muted">Escribe solo el nombre. Ejemplo: Rosa María. Si no lo sabes, déjalo vacío y toca Siguiente.</p>';
+    h += '<input class="i" id="wGiven" value="' + esc(d.given) + '" autocomplete="off" />';
+    h += botonesPaso('Siguiente ➜', false);
+  } else if (n === 2) {
+    h += '<p class="preg">¿Cuáles son sus apellidos?</p><p class="muted">' + (T.orden === 'mp' ? 'Primero el de la mamá, luego el del papá.' : 'Primero el del papá, luego el de la mamá.') + ' Ejemplo: Quispe Mamani</p>';
+    h += '<div class="row"><input class="i grow" id="fSur" value="' + esc(d.surname) + '" autocomplete="off" /><button class="btn sm sec" onclick="App.invierte()" title="Cambiar el orden">⇄</button></div>';
+    h += '<p class="muted">⇄ cambia el orden de los dos apellidos.</p>';
+    h += botonesPaso('Siguiente ➜', true);
+  } else if (n === 3) {
+    h += '<p class="preg">¿Es hombre o mujer?</p>';
+    h += '<button class="btn xl block' + (d.sex === 'M' ? '' : ' sec') + '" onclick="App.wSexo(\'M\')">👨 Hombre</button>';
+    h += '<button class="btn xl block' + (d.sex === 'F' ? '' : ' sec') + '" onclick="App.wSexo(\'F\')">👩 Mujer</button>';
+    h += botonesPaso(d.sex ? 'Siguiente ➜' : 'No sé, seguir ➜', true);
+  } else if (n === 4) {
+    h += '<p class="preg">¿Cuándo y dónde nació?</p><p class="muted">Si no sabes, déjalo en blanco.</p>';
+    h += '<label class="f">Fecha o año (ejemplo: 1950)</label><input class="i" id="wBirth" value="' + esc(d.birth) + '" autocomplete="off" />';
+    h += '<label class="f">Lugar (ejemplo: Cusco)</label><input class="i" id="wBPlace" value="' + esc(d.birthPlace) + '" autocomplete="off" />';
+    h += botonesPaso('Siguiente ➜', true);
+  } else if (n === 5) {
+    h += '<p class="preg">¿Vive todavía?</p>';
+    h += '<button class="btn xl block' + (!d.dead ? '' : ' sec') + '" onclick="App.wVive(true)">🙂 Sí, vive</button>';
+    h += '<button class="btn xl block' + (d.dead ? '' : ' sec') + '" onclick="App.wVive(false)">🕊️ Ya falleció</button>';
+    if (d.dead) {
+      h += '<label class="f">¿Cuándo falleció? (si sabes)</label><input class="i" id="wDeath" value="' + esc(d.death) + '" autocomplete="off" />';
+      h += '<label class="f">¿Dónde? (si sabes)</label><input class="i" id="wDPlace" value="' + esc(d.deathPlace) + '" autocomplete="off" />';
+      h += botonesPaso('Siguiente ➜', true);
+    } else h += botonesPaso(null, true);
+  } else {
+    h += '<p class="preg">¿Quieres poner una foto?</p>';
+    h += '<div id="fPrev">' + prevFoto() + '</div>';
+    h += '<label class="btn xl block sec">📷 Elegir o tomar una foto<input type="file" accept="image/*" style="display:none" onchange="App.foto(this)"/></label>';
+    h += '<button class="btn xl block" onclick="App.wFin()">✅ Terminar y guardar</button>';
+    h += '<button class="btn block sec" onclick="App.wPaso(-1)">⬅ Atrás</button>';
+  }
+  abre(h);
+  var f = $('wGiven') || $('fSur') || $('wBirth');
+  if (f && n <= 2) try { f.focus(); } catch (e) {}
+}
+function botonesPaso(sig, atras) {
+  var h = '';
+  if (sig) h += '<button class="btn xl block" onclick="App.wPaso(1)">' + sig + '</button>';
+  if (atras) h += '<button class="btn block sec" onclick="App.wPaso(-1)">⬅ Atrás</button>';
+  return h;
+}
+App.wPaso = function (dir) {
+  leePaso();
+  if (dir > 0 && W.paso === 2 && !W.d.given && !W.d.surname) { alert('Escribe por lo menos el nombre o un apellido.'); return; }
+  W.paso = Math.max(1, Math.min(NPASOS, W.paso + dir));
+  pintaPaso();
+};
+App.wSexo = function (s) { leePaso(); W.d.sex = s; W.paso = 4; pintaPaso(); };
+App.wVive = function (vive) { leePaso(); W.d.dead = !vive; if (vive) { W.d.death = ''; W.d.deathPlace = ''; W.paso = 6; } pintaPaso(); };
+App.wFin = function () {
+  leePaso();
+  var d = W.d; d.photo = FOTO; if (!d.sex) d.sex = 'U';
+  if (!d.given && !d.surname) { W.paso = 1; pintaPaso(); alert('Falta el nombre.'); return; }
+  guardaNueva(d);
+};
+/* persona ya anotada con el mismo nombre y apellidos (sin importar tildes ni mayúsculas) */
+function mismoNombre(d) {
+  var g = sinTildes(trim(d.given)), s = sinTildes(trim(d.surname)), k, p;
+  if (!g) return null;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    p = T.persons[k];
+    if (PEND && (k === PEND.de || k === PEND.otro)) continue;
+    if (sinTildes(trim(p.given)) === g && sinTildes(trim(p.surname)) === s) return k;
+  }
+  return null;
+}
+var DNUEVA = null;
+App.esLaMisma = function (si) {
+  var d = DNUEVA, ya = mismoNombre(d);
+  DNUEVA = null;
+  if (!si || !ya) { guardaNueva(d, true); return; }
+  W = null;
+  if (PEND) App.tomaExistente(ya); else App.ver(ya);
+};
+function guardaNueva(d, sinAviso) {
+  var ya = sinAviso ? null : mismoNombre(d), h;
+  if (ya) {
+    DNUEVA = d;
+    h = '<h3>Ya está anotada una persona con ese nombre</h3>';
+    h += '<div class="card"><p class="gran" style="margin:0">' + esc(nombre(P(ya))) + ' <span class="muted">' + esc(anios(P(ya))) + '</span></p></div>';
+    h += '<p class="preg">¿Es la misma persona?</p>';
+    h += '<button class="btn xl block" onclick="App.esLaMisma(true)">✅ Sí, es la misma</button>';
+    h += '<button class="btn block sec" onclick="App.esLaMisma(false)">➕ No, es otra persona</button>';
+    abre(h); return;
+  }
+  if (d.death) d.dead = true;
+  var p = nuevaPersona(d), ver;
+  reindex();
+  if (PEND) {
+    if (!aplicaPend(p.id)) { delete T.persons[p.id]; reindex(); return; }
+    ver = PEND.de;
+  } else ver = p.id;
+  if (!P(T.focus)) T.focus = p.id;
+  var tipo = PEND ? PEND.tipo : null;
+  PEND = null; W = null;
+  cambio(); refrescar(); App.ver(ver);
+  if (tipo === 'child' || tipo === 'sibling') revisaTrasAgregar(p.id);
+}
+
+/* ---------- formulario para cambiar datos ---------- */
+function formulario(id, d) {
+  EDITA = id; FOTO = d.photo || '';
+  var h = '<h3>✏️ Cambiar datos de ' + esc(nombre(d)) + '</h3>';
+  h += '<div id="fPrev">' + prevFoto() + '</div>';
+  h += '<div class="row"><label class="btn sm sec grow">📷 Cambiar foto<input type="file" accept="image/*" style="display:none" onchange="App.foto(this)"/></label><button class="btn sm sec grow" onclick="App.sinFoto()">Quitar foto</button></div>';
+  h += campo('Nombre', 'fGiven', d.given);
+  h += '<label class="f">Apellidos</label><div class="row"><input class="i grow" id="fSur" value="' + esc(d.surname || '') + '" /><button class="btn sm sec" title="Cambiar el orden" onclick="App.invierte()">⇄</button></div>';
+  h += '<label class="f">Es</label><select class="i" id="fSex"><option value="M">Hombre</option><option value="F">Mujer</option><option value="U">No sé</option></select>';
+  h += campo('Cuándo nació', 'fBirth', d.birth);
+  h += campo('Dónde nació', 'fBPlace', d.birthPlace);
+  h += '<div class="chk"><input type="checkbox" id="fDead"' + (d.dead ? ' checked' : '') + ' /><span>Ya falleció</span></div>';
+  h += campo('Cuándo falleció', 'fDeath', d.death) + campo('Dónde falleció', 'fDPlace', d.deathPlace);
+  h += '<label class="f">Recuerdos y notas (trabajo, historias…)</label><textarea class="i" id="fNotes">' + esc(d.notes || '') + '</textarea>';
+  h += '<button class="btn xl block" onclick="App.guardaForm()">💾 Guardar los cambios</button>';
+  h += '<button class="btn block sec" onclick="App.cancelaForm()">Cancelar</button>';
+  abre(h);
+  $('fSex').value = d.sex || 'U';
+}
+function campo(l, id, v) { return '<label class="f">' + l + '</label><input class="i" id="' + id + '" value="' + esc(v || '') + '" />'; }
+function prevFoto() { return FOTO ? '<img class="foto" src="' + FOTO + '" alt=""/>' : ''; }
+App.foto = function (inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    var im = new Image();
+    im.onload = function () {
+      var S = 128, c = document.createElement('canvas'), x = c.getContext('2d'), s = Math.min(im.width, im.height);
+      c.width = S; c.height = S;
+      x.fillStyle = '#fff'; x.fillRect(0, 0, S, S);
+      x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, S, S);
+      try { FOTO = c.toDataURL('image/jpeg', 0.75); } catch (e) { FOTO = ''; alert('No se pudo usar esa foto.'); }
+      if ($('fPrev')) $('fPrev').innerHTML = prevFoto();
+    };
+    im.onerror = function () { alert('Ese archivo no es una foto.'); };
+    im.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+};
+App.invierte = function () {
+  var w = trim($('fSur').value).split(/\s+/);
+  if (w.length === 2) { $('fSur').value = w[1] + ' ' + w[0]; return; }
+  alert(w.length < 2 ? 'Hay un solo apellido; no hay nada que cambiar.' : 'Los apellidos tienen varias palabras (por ejemplo “de la Cruz”). Escríbelos en el orden correcto.');
+};
+App.orden = function (v) { T.orden = v === 'mp' ? 'mp' : 'pm'; persist(); };
+App.sinFoto = function () { FOTO = ''; $('fPrev').innerHTML = ''; };
+App.cancelaForm = function () { if (EDITA) App.ver(EDITA); else App.cerrar(); };
+App.guardaForm = function () {
+  var d = {
+    given: trim($('fGiven').value), surname: trim($('fSur').value), sex: $('fSex').value,
+    birth: trim($('fBirth').value), birthPlace: trim($('fBPlace').value),
+    dead: $('fDead').checked, death: trim($('fDeath').value), deathPlace: trim($('fDPlace').value),
+    notes: $('fNotes').value, photo: FOTO
+  };
+  if (!d.given && !d.surname) { alert('Escribe por lo menos el nombre o un apellido.'); return; }
+  if (d.death) d.dead = true;
+  var p = P(EDITA), k, ver = EDITA;
+  for (k in d) if (d.hasOwnProperty(k)) p[k] = d[k];
+  EDITA = null;
+  cambio(); refrescar(); App.ver(ver);
+};
+
+/* ---------- botón GUARDAR, avisos y letra ---------- */
+var TT = null;
+function aviso(txt) {
+  var t = $('toast'); t.innerHTML = txt; t.style.display = 'block';
+  if (TT) clearTimeout(TT);
+  TT = setTimeout(function () { t.style.display = 'none'; }, 2000);
+}
+function fechaLocal(iso) {
+  var d = new Date(iso), m, dd;
+  if (isNaN(d.getTime())) return String(iso || '').substr(0, 10);
+  m = d.getMonth() + 1; dd = d.getDate();
+  return (dd < 10 ? '0' : '') + dd + '/' + (m < 10 ? '0' : '') + m + '/' + d.getFullYear();
+}
+function horaCorta(d) { var m = d.getMinutes(); return d.getHours() + ':' + (m < 10 ? '0' : '') + m; }
+function botonesCopia() {
+  return '<button class="btn xl block ocre" onclick="App.compartir()">📤 Enviar una copia</button>' +
+    '<button class="btn block sec" onclick="App.exportJSON()">💾 Guardar la copia en este teléfono</button>' +
+    '<p class="muted">' + (T.lastBackup ? 'Última copia: ' + esc(fechaLocal(T.lastBackup)) : 'Todavía no has enviado ninguna copia.') + '</p>';
+}
+App.guardar = function () {
+  var falta = 2, todoBien = true;
+  abre('<div class="ok">⏳</div><h3 style="text-align:center;margin-right:0">Guardando…</h3>');
+  function listo(ok) {
+    if (!ok) todoBien = false;
+    if (--falta > 0) return;
+    var h;
+    if (todoBien) {
+      h = '<div class="ok">✅</div><h3 style="text-align:center;margin-right:0">¡Listo! Tu árbol está guardado.</h3>';
+      h += '<p class="gran" style="text-align:center">Se guardó en este teléfono a las ' + horaCorta(new Date()) + '.</p>';
+      h += '<div class="card"><p class="gran" style="margin-top:0">Para no perderlo nunca, envía una copia a un familiar o a tu correo:</p>' + botonesCopia() + '</div>';
+    } else {
+      h = '<div class="ok">❌</div><h3 style="text-align:center;margin-right:0">El teléfono NO pudo guardar.</h3>';
+      h += '<p class="gran" style="text-align:center">Tu árbol todavía está en la pantalla, pero <b>se puede perder si cierras la app</b>. Puede ser que la memoria esté llena o que estés en modo privado.</p>';
+      h += '<div class="card aviso" style="margin:0 0 14px"><p class="gran" style="margin-top:0"><b>Envía una copia ahora mismo:</b></p>' + botonesCopia() + '</div>';
+      h += '<button class="btn block sec" onclick="App.guardar()">🔁 Intentar guardar otra vez</button>';
+    }
+    h += '<button class="btn block sec" onclick="App.cerrar()">👍 Cerrar</button>';
+    abre(h);
+  }
+  persist(listo); guardaIdx(listo);
+};
+var LETRAS = ['', 'g2', 'g3'];
+App.letra = function () {
+  var i = (LETRAS.indexOf(document.body.className) + 1) % LETRAS.length;
+  document.body.className = LETRAS[i];
+  IDX.letra = LETRAS[i]; guardaIdx();
+  aviso(['Letra normal', 'Letra grande', 'Letra muy grande'][i]);
+  if ($('vArbol').className.indexOf(' on') >= 0) altoLienzo();
+};
+App.impRapida = function (que) {
+  $('pQue').value = que;
+  if (!trim($('pTit').value)) $('pTit').value = 'Árbol familiar — ' + T.name;
+  if (que === 'arbol') {
+    if (!focoValido()) { alert('El árbol está vacío.'); return; }
+    var out = disenar(), ops = [1, 2, 3, 4, 6, 8, 12], i, pl;
+    $('pPapel').value = 'A4'; $('pOri').value = 'h';
+    for (i = 0; i < ops.length; i++) {
+      $('pHojas').value = String(ops[i]); pl = planHojas(out);
+      if (14 * pl.mmPorU >= 3) break;
+    }
+    if (pl.cols * pl.filas > 1 && !confirm('Tu árbol es grande. Se imprimirá en ' + (pl.cols * pl.filas) + ' hojas A4, para unirlas como un póster (cada hoja dice su fila y columna).\n¿Imprimir?')) return;
+  }
+  App.infoImp();
+  App.imprimir();
+};
+
+/* ---------- imprimir ---------- */
+var PAPEL = { A4: [210, 297], Carta: [216, 279], Oficio: [216, 330], A3: [297, 420], A2: [420, 594], A1: [594, 841], A0: [841, 1189] };
+function medidasHoja() {
+  var pp = PAPEL[$('pPapel').value] || PAPEL.A4, h = $('pOri').value === 'h';
+  var W = h ? pp[1] : pp[0], H = h ? pp[0] : pp[1];
+  /* en papel grande el título de arriba también crece, para que se lea de lejos */
+  var k = pp[0] >= 841 ? 3 : pp[0] >= 594 ? 2.5 : pp[0] >= 420 ? 1.6 : 1;
+  return { W: W, H: H, k: k, cw: W - 20, ch: H - 20 - Math.round(10 * k + 2), ori: h ? 'landscape' : 'portrait' };
+}
+/* póster: el papel más chico (A3→A0) en que el árbol entra en 1 hoja con letra de 3 mm o más */
+App.impGrande = function () {
+  if (!focoValido()) { alert('El árbol está vacío.'); return; }
+  var out = disenar(), tam = ['A3', 'A2', 'A1', 'A0'], ori = ['h', 'v'], i, j, pl, mejor = null;
+  $('pQue').value = 'arbol'; $('pHojas').value = '1';
+  if (!trim($('pTit').value)) $('pTit').value = 'Árbol familiar — ' + T.name;
+  for (i = 0; i < tam.length && !mejor; i++) {
+    for (j = 0; j < ori.length; j++) {
+      $('pPapel').value = tam[i]; $('pOri').value = ori[j]; pl = planHojas(out);
+      if (14 * pl.mmPorU >= 3 && (!mejor || pl.mmPorU > mejor.u)) mejor = { t: tam[i], o: ori[j], u: pl.mmPorU };
+    }
+  }
+  if (!mejor) {
+    $('pPapel').value = 'A0';
+    $('pOri').value = 'h'; var u1 = planHojas(out).mmPorU; $('pOri').value = 'v';
+    mejor = { t: 'A0', o: u1 >= planHojas(out).mmPorU ? 'h' : 'v' };
+  }
+  $('pPapel').value = mejor.t; $('pOri').value = mejor.o;
+  pl = planHojas(out);
+  if (14 * pl.mmPorU < 2.2 && !confirm('Tu árbol es muy grande: aun en una hoja A0 la letra saldría de ≈' + (Math.round(14 * pl.mmPorU * 10) / 10) + ' mm (difícil de leer).\n\nMejor: en “Más opciones de impresión” elige papel A0 y 2 o más hojas de ancho.\n¿Preparar igual 1 hoja A0?')) return;
+  if (!confirm('Se preparará 1 hoja ' + mejor.t + ' (' + (mejor.o === 'h' ? 'echada' : 'parada') + '), con letra de ≈' + (Math.round(14 * pl.mmPorU * 10) / 10) + ' mm.\n\nEn la pantalla de impresión elige “Guardar como PDF” y lleva ese PDF a una imprenta o plotter.\n¿Continuar?')) return;
+  App.infoImp();
+  App.imprimir();
+};
+function planHojas(out) {
+  var m = medidasHoja(), n = parseInt($('pHojas').value, 10), tw, th, filas, esc1;
+  if (n === 1) {
+    esc1 = Math.min(m.cw / out.w, m.ch / out.h);
+    return { m: m, cols: 1, filas: 1, tw: out.w, th: out.h, mmPorU: esc1 };
+  }
+  tw = out.w / n; th = tw * m.ch / m.cw;
+  filas = Math.max(1, Math.ceil(out.h / th - 0.001));
+  return { m: m, cols: n, filas: filas, tw: tw, th: th, mmPorU: m.cw / tw };
+}
+App.infoImp = function () {
+  var inf = $('pInfo');
+  if ($('pQue').value === 'lista') { inf.innerHTML = 'Se imprimirá una tabla con las ' + ordenadas().length + ' personas del árbol, ordenadas por apellido.'; return; }
+  if (!focoValido()) { inf.innerHTML = 'El árbol está vacío.'; return; }
+  var out = disenar(), pl = planHojas(out), letra = 14 * pl.mmPorU;
+  inf.innerHTML = 'Árbol actual: ' + out.boxes.length + ' casillas. Se usarán <b>' + (pl.cols * pl.filas) + ' hoja(s)</b> (' + pl.cols + ' de ancho × ' + pl.filas + ' de alto). Letra de los nombres ≈ <b>' + (Math.round(letra * 10) / 10) + ' mm</b>' + (letra < 2.2 ? ' — <b style="color:#A33B2B">muy pequeña: elige más hojas de ancho o papel más grande</b>' : '') + '.';
+};
+App.imprimir = function () {
+  var pa = $('printArea'), tit = esc(trim($('pTit').value) || T.name), h = '', m;
+  if ($('pQue').value === 'lista') {
+    m = medidasHoja();
+    $('pageStyle').innerHTML = '@page{size:' + m.W + 'mm ' + m.H + 'mm;margin:10mm}';
+    pa.innerHTML = tablaImp(tit);
+    setTimeout(function () { window.print(); }, 300);
+    return;
+  }
+  if (!focoValido()) { alert('El árbol está vacío.'); return; }
+  var out = disenar(), pl = planHojas(out), inner = interiorSVG(out, $('pFotos').checked), r, c, i = 0, tot = pl.cols * pl.filas, vb;
+  m = pl.m;
+  $('pageStyle').innerHTML = '@page{size:' + m.W + 'mm ' + m.H + 'mm;margin:10mm}';
+  for (r = 0; r < pl.filas; r++) for (c = 0; c < pl.cols; c++) {
+    i++;
+    vb = pl.cols === 1 ? out.x + ' ' + out.y + ' ' + out.w + ' ' + out.h : r1(out.x + c * pl.tw) + ' ' + r1(out.y + r * pl.th) + ' ' + r1(pl.tw) + ' ' + r1(pl.th);
+    h += '<div class="pg"><div class="ph"' + (m.k > 1 ? ' style="font-size:' + r1(11 * m.k) + 'pt;height:' + r1(8 * m.k) + 'mm"' : '') + '>' + tit + (tot > 1 ? ' <span>Hoja ' + i + ' de ' + tot + ' · fila ' + (r + 1) + ', columna ' + (c + 1) + '</span>' : ' <span>' + hoy() + '</span>') + '</div>';
+    h += docSVG(inner, vb, m.cw + 'mm', m.ch + 'mm', ' preserveAspectRatio="xMidYMin meet"') + '</div>';
+  }
+  pa.innerHTML = h;
+  setTimeout(function () { window.print(); }, 400);
+};
+function tablaImp(tit) {
+  var a = ordenadas(), h = '<div class="ph" style="font:bold 12pt Helvetica,Arial,sans-serif;margin-bottom:4mm">' + tit + ' — lista de personas (' + a.length + ') · ' + hoy() + '</div>', i, p, ps, j, ns;
+  h += '<table class="pt"><thead><tr><th>#</th><th>Nombre</th><th>Nacimiento</th><th>Fallecimiento</th><th>Padre</th><th>Madre</th><th>Pareja(s)</th><th>Notas</th></tr></thead><tbody>';
+  for (i = 0; i < a.length; i++) {
+    p = a[i]; ps = parejas(p.id); ns = [];
+    for (j = 0; j < ps.length; j++) ns.push(nombre(P(ps[j])));
+    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(nombre(p)) + '</b></td><td>' + esc(trim(p.birth + ' ' + (p.birthPlace ? '· ' + p.birthPlace : ''))) + '</td><td>' + esc(p.dead || p.death ? trim((p.death || '†') + ' ' + (p.deathPlace ? '· ' + p.deathPlace : '')) : '') + '</td><td>' + esc(P(p.father) ? nombre(P(p.father)) : '') + '</td><td>' + esc(P(p.mother) ? nombre(P(p.mother)) : '') + '</td><td>' + esc(ns.join(', ')) + '</td><td>' + esc(corta(p.notes, 160)) + '</td></tr>';
+  }
+  return h + '</tbody></table>';
+}
+function svgCompleto(fotos) {
+  var out = disenar();
+  return { out: out, svg: '<?xml version="1.0" encoding="UTF-8"?>\n' + docSVG('<rect x="' + out.x + '" y="' + out.y + '" width="' + out.w + '" height="' + out.h + '" fill="#ffffff"/>' + interiorSVG(out, fotos), out.x + ' ' + out.y + ' ' + out.w + ' ' + out.h, r1(out.w), r1(out.h)) };
+}
+App.bajarSVG = function () {
+  if (!focoValido()) { alert('El árbol está vacío.'); return; }
+  bajar(slug(T.name) + '-' + hoy() + '.svg', svgCompleto($('pFotos').checked).svg, 'image/svg+xml');
+};
+App.bajarPNG = function () {
+  if (!focoValido()) { alert('El árbol está vacío.'); return; }
+  var s = svgCompleto($('pFotos').checked), o = s.out;
+  var k = Math.min(2, Math.sqrt(16e6 / (o.w * o.h)), 8000 / o.w, 8000 / o.h);
+  var im = new Image();
+  im.onload = function () {
+    try {
+      var c = document.createElement('canvas');
+      c.width = Math.floor(o.w * k); c.height = Math.floor(o.h * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      bajarURL(slug(T.name) + '-' + hoy() + '.png', c.toDataURL('image/png'));
+    } catch (e) { alert('Este navegador no permitió crear el PNG. Usa “Descargar imagen SVG” o “Imprimir / Guardar PDF”.'); }
+  };
+  im.onerror = function () { alert('Este navegador no permitió crear el PNG. Usa “Descargar imagen SVG” o “Imprimir / Guardar PDF”.'); };
+  im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s.svg.replace(/^<\?xml[^>]*>\s*/, ''));
+};
+
+/* ---------- descargas ---------- */
+function bajar(nom, texto, mime) {
+  var b = null, a = document.createElement('a');
+  try { b = new Blob([texto], { type: mime + ';charset=utf-8' }); } catch (e) { b = null; }
+  if (b && window.URL && URL.createObjectURL && ('download' in a)) {
+    a.href = URL.createObjectURL(b); a.download = nom; a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 2000);
+    return true;
+  }
+  bajarURL(nom, 'data:' + mime + ';charset=utf-8,' + encodeURIComponent(texto));
+  return true;
+}
+function bajarURL(nom, url) {
+  var a = document.createElement('a');
+  if ('download' in a) {
+    a.href = url; a.download = nom; a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); }, 2000);
+  } else {
+    var w = window.open(url, '_blank');
+    if (!w) alert('Permite las ventanas emergentes para descargar el archivo.');
+  }
+}
+
+/* ---------- datos: copias, GEDCOM, árboles ---------- */
+function marcaCopia() { T.changes = 0; T.lastBackup = new Date().toISOString(); persist(); avisoCopia(); }
+App.exportJSON = function () {
+  bajar(slug(T.name) + '-' + hoy() + '.json', textoCopia(), 'application/json');
+  marcaCopia();
+  if ($('vDatos').className.indexOf(' on') >= 0) pintaDatos();
+};
+function textoCopia() { return JSON.stringify({ app: 'arbol-familiar', version: 1, exported: new Date().toISOString(), tree: T }, null, 1); }
+App.compartir = function () {
+  var nom = slug(T.name) + '-' + hoy() + '.json', txt = textoCopia(), f = null, tipos = ['application/json', 'text/plain'], i;
+  if (navigator.share && navigator.canShare && window.File) {
+    for (i = 0; i < tipos.length && !f; i++) {
+      try { var cand = new File([txt], nom, { type: tipos[i] }); if (navigator.canShare({ files: [cand] })) f = cand; } catch (e) {}
+    }
+  }
+  if (!f) {
+    alert('Este teléfono o navegador no permite compartir archivos. Se guardará la copia en Descargas; desde allí puedes enviarla.');
+    App.exportJSON(); return;
+  }
+  navigator.share({ files: [f], title: 'Copia del árbol ' + T.name }).then(function () {
+    marcaCopia();
+    if ($('vDatos').className.indexOf(' on') >= 0) pintaDatos();
+  }, function (err) {
+    if (err && err.name === 'AbortError') return;
+    alert('No se pudo compartir. Se guardará la copia en Descargas.');
+    App.exportJSON();
+  });
+};
+var MES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function aGedFecha(s) {
+  s = trim(s); var m;
+  if (!s) return '';
+  if ((m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(s)) && +m[2] >= 1 && +m[2] <= 12) return (+m[1]) + ' ' + MES[+m[2] - 1] + ' ' + m[3];
+  if ((m = /^(\d{1,2})[\/\-.](\d{4})$/.exec(s)) && +m[1] >= 1 && +m[1] <= 12) return MES[+m[1] - 1] + ' ' + m[2];
+  if (/^\d{4}$/.test(s)) return s;
+  if ((m = /^(aprox\.?|aproximadamente|circa|c\.|hacia)\s*(\d{4})$/i.exec(s))) return 'ABT ' + m[2];
+  return '(' + s.replace(/[()]/g, '') + ')';
+}
+function deGedFecha(s) {
+  s = trim(s).toUpperCase(); var m, pre = '';
+  if (!s) return '';
+  if (/^\(.*\)$/.test(s)) return s.slice(1, -1).toLowerCase();
+  if ((m = /^(ABT|EST|CAL|BEF|AFT)\s+(.*)$/.exec(s))) { pre = { ABT: 'aprox. ', EST: 'aprox. ', CAL: 'aprox. ', BEF: 'antes de ', AFT: 'después de ' }[m[1]]; s = m[2]; }
+  if ((m = /^(\d{1,2}) ([A-Z]{3}) (\d{4})$/.exec(s)) && MES.indexOf(m[2]) >= 0) { var mm = MES.indexOf(m[2]) + 1; return pre + (m[1].length < 2 ? '0' : '') + m[1] + '/' + (mm < 10 ? '0' : '') + mm + '/' + m[3]; }
+  if ((m = /^([A-Z]{3}) (\d{4})$/.exec(s)) && MES.indexOf(m[1]) >= 0) { var m2 = MES.indexOf(m[1]) + 1; return pre + (m2 < 10 ? '0' : '') + m2 + '/' + m[2]; }
+  return pre + s;
+}
+function gedTexto(nivel, tag, texto) {
+  var ls = String(texto).split(/\r?\n/), r = nivel + ' ' + tag + ' ' + ls[0] + '\n', i;
+  for (i = 1; i < ls.length; i++) r += (nivel + 1) + ' CONT ' + ls[i] + '\n';
+  return r;
+}
+App.exportGED = function () {
+  var ids = [], k, i, p, xi = {}, fams = {}, famL = [], g = '', key, f, j;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) ids.push(k);
+  for (i = 0; i < ids.length; i++) xi[ids[i]] = '@I' + (i + 1) + '@';
+  function fam(a, b, esHijo) {
+    var s = [a || '', b || ''].sort(), kk = s[0] + '|' + s[1];
+    if (!fams[kk]) { fams[kk] = { husb: null, wife: null, chil: [], x: '@F' + (famL.length + 1) + '@' }; famL.push(fams[kk]); }
+    return fams[kk];
+  }
+  for (i = 0; i < ids.length; i++) {
+    p = T.persons[ids[i]];
+    var fa = P(p.father) ? p.father : null, mo = P(p.mother) ? p.mother : null;
+    if (fa || mo) { f = fam(fa, mo); if (fa) f.husb = fa; if (mo) f.wife = mo; f.chil.push(ids[i]); }
+    for (j = 0; j < (p.spouses || []).length; j++) {
+      var s = p.spouses[j]; if (!P(s)) continue;
+      f = fam(ids[i], s);
+      if (!f.husb && !f.wife) {
+        var ro = rolesDe(ids[i], s); f.husb = ro.father; f.wife = ro.mother;
+      }
+    }
+  }
+  g += '0 HEAD\n1 SOUR ARBOL_FAMILIAR\n2 VERS 1\n1 DATE ' + aGedFecha(hoy().split('-').reverse().join('/')) + '\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n';
+  for (i = 0; i < ids.length; i++) {
+    p = T.persons[ids[i]];
+    g += '0 ' + xi[ids[i]] + ' INDI\n1 NAME ' + trim(p.given) + ' /' + trim(p.surname) + '/\n';
+    if (p.given) g += '2 GIVN ' + trim(p.given) + '\n';
+    if (p.surname) g += '2 SURN ' + trim(p.surname) + '\n';
+    g += '1 SEX ' + (p.sex === 'M' || p.sex === 'F' ? p.sex : 'U') + '\n';
+    if (p.birth || p.birthPlace) { g += '1 BIRT\n'; if (p.birth) g += '2 DATE ' + aGedFecha(p.birth) + '\n'; if (p.birthPlace) g += '2 PLAC ' + p.birthPlace + '\n'; }
+    if (p.dead || p.death || p.deathPlace) { g += '1 DEAT' + (p.death || p.deathPlace ? '' : ' Y') + '\n'; if (p.death) g += '2 DATE ' + aGedFecha(p.death) + '\n'; if (p.deathPlace) g += '2 PLAC ' + p.deathPlace + '\n'; }
+    if (p.notes) g += gedTexto(1, 'NOTE', p.notes);
+    for (j = 0; j < famL.length; j++) {
+      f = famL[j];
+      if (f.chil.indexOf(ids[i]) >= 0) g += '1 FAMC ' + f.x + '\n';
+      if (f.husb === ids[i] || f.wife === ids[i]) g += '1 FAMS ' + f.x + '\n';
+    }
+  }
+  for (j = 0; j < famL.length; j++) {
+    f = famL[j];
+    g += '0 ' + f.x + ' FAM\n';
+    if (f.husb) g += '1 HUSB ' + xi[f.husb] + '\n';
+    if (f.wife) g += '1 WIFE ' + xi[f.wife] + '\n';
+    for (i = 0; i < f.chil.length; i++) g += '1 CHIL ' + xi[f.chil[i]] + '\n';
+  }
+  g += '0 TRLR\n';
+  bajar(slug(T.name) + '-' + hoy() + '.ged', g, 'text/plain');
+};
+function deGED(txt) {
+  var ls = txt.replace(/^﻿/, '').split(/\r?\n|\r/), i, m, lv, xref, tag, val, rec = null, sub = null;
+  var indi = {}, fams = {};
+  for (i = 0; i < ls.length; i++) {
+    m = /^\s*(\d+)\s+(@[^@]+@\s+)?(\S+)\s?(.*)$/.exec(ls[i]);
+    if (!m) continue;
+    lv = +m[1]; xref = m[2] ? trim(m[2]) : null; tag = m[3].toUpperCase(); val = m[4] || '';
+    if (lv === 0) {
+      sub = null; rec = null;
+      if (tag === 'INDI' && xref) rec = indi[xref] = { t: 'I', given: '', surname: '', sex: 'U', birth: '', birthPlace: '', death: '', deathPlace: '', dead: false, notes: '' };
+      else if (tag === 'FAM' && xref) rec = fams[xref] = { t: 'F', husb: null, wife: null, chil: [] };
+      continue;
+    }
+    if (!rec) continue;
+    if (lv === 1) {
+      sub = tag;
+      if (rec.t === 'I') {
+        if (tag === 'NAME' && !rec._n) {
+          rec._n = true;
+          var nm = /^([^\/]*)\/([^\/]*)\/?(.*)$/.exec(val);
+          if (nm) { rec.given = trim(nm[1] + ' ' + nm[3]); rec.surname = trim(nm[2]); } else rec.given = trim(val);
+        } else if (tag === 'SEX') rec.sex = /^[MF]/i.test(val) ? val.charAt(0).toUpperCase() : 'U';
+        else if (tag === 'DEAT') rec.dead = true;
+        else if (tag === 'NOTE' && val.charAt(0) !== '@') rec.notes += (rec.notes ? '\n' : '') + val;
+      } else {
+        if (tag === 'HUSB') rec.husb = trim(val);
+        else if (tag === 'WIFE') rec.wife = trim(val);
+        else if (tag === 'CHIL') rec.chil.push(trim(val));
+      }
+    } else if (rec.t === 'I') {
+      if ((sub === 'BIRT' || sub === 'DEAT') && (tag === 'DATE' || tag === 'PLAC')) {
+        var campoG = (sub === 'BIRT' ? 'birth' : 'death') + (tag === 'PLAC' ? 'Place' : '');
+        if (!rec[campoG]) rec[campoG] = tag === 'DATE' ? deGedFecha(val) : trim(val);
+      } else if (sub === 'NOTE' && (tag === 'CONT' || tag === 'CONC')) rec.notes += (tag === 'CONT' ? '\n' : '') + val;
+      else if (sub === 'NAME' && tag === 'GIVN' && !rec.given) rec.given = trim(val);
+      else if (sub === 'NAME' && tag === 'SURN' && !rec.surname) rec.surname = trim(val);
+    }
+  }
+  var t = arbolVacio(uid('t'), 'Importado'), map = {}, k, r, np, f, j;
+  for (k in indi) if (indi.hasOwnProperty(k)) {
+    r = indi[k]; np = uid('p') + Math.floor(Math.random() * 1e4);
+    t.persons[np] = { id: np, given: r.given, surname: r.surname, sex: r.sex, birth: r.birth, birthPlace: r.birthPlace, death: r.death, deathPlace: r.deathPlace, dead: r.dead || !!r.death, notes: r.notes, photo: '', father: null, mother: null, spouses: [] };
+    map[k] = np;
+  }
+  for (k in fams) if (fams.hasOwnProperty(k)) {
+    f = fams[k];
+    var h = map[f.husb] || null, w = map[f.wife] || null;
+    if (h && w) { t.persons[h].spouses.push(w); t.persons[w].spouses.push(h); }
+    for (j = 0; j < f.chil.length; j++) {
+      var c = map[f.chil[j]]; if (!c) continue;
+      if (h && h !== c) t.persons[c].father = h;
+      if (w && w !== c) t.persons[c].mother = w;
+    }
+  }
+  return t;
+}
+function limpiaArbol(src) {
+  var t = arbolVacio(uid('t'), trim(src.name) || 'Importado'), k, s, p, campos = ['given', 'surname', 'sex', 'birth', 'birthPlace', 'death', 'deathPlace', 'notes', 'photo'], i;
+  for (k in src.persons) if (src.persons.hasOwnProperty(k)) {
+    s = src.persons[k]; if (!s || typeof s !== 'object') continue;
+    p = { id: k, father: null, mother: null, spouses: [], dead: !!s.dead };
+    for (i = 0; i < campos.length; i++) p[campos[i]] = typeof s[campos[i]] === 'string' ? s[campos[i]] : '';
+    if (p.sex !== 'M' && p.sex !== 'F') p.sex = 'U';
+    if (p.photo && p.photo.indexOf('data:image/') !== 0) p.photo = '';
+    p.father = typeof s.father === 'string' ? s.father : null;
+    p.mother = typeof s.mother === 'string' ? s.mother : null;
+    if (s.spouses && s.spouses.length) for (i = 0; i < s.spouses.length; i++) if (typeof s.spouses[i] === 'string') p.spouses.push(s.spouses[i]);
+    t.persons[k] = p;
+  }
+  for (k in t.persons) if (t.persons.hasOwnProperty(k)) {
+    p = t.persons[k];
+    if (!t.persons[p.father] || p.father === k) p.father = null;
+    if (!t.persons[p.mother] || p.mother === k) p.mother = null;
+    p.spouses = p.spouses.filter(function (x) { return !!t.persons[x] && x !== k; });
+  }
+  if (typeof src.focus === 'string' && t.persons[src.focus]) t.focus = src.focus;
+  if (typeof src.up === 'number') t.up = src.up;
+  if (typeof src.down === 'number') t.down = src.down;
+  if (src.orden === 'mp') t.orden = 'mp';
+  return t;
+}
+App.importar = function () { $('fImport').value = ''; $('fImport').click(); };
+App.leerArchivo = function (inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    var txt = String(rd.result), t = null, o;
+    try {
+      if (/^\s*[\{\[]/.test(txt.replace(/^﻿/, ''))) {
+        o = JSON.parse(txt.replace(/^﻿/, ''));
+        if (o && o.tree && o.tree.persons) t = limpiaArbol(o.tree);
+        else if (o && o.persons) t = limpiaArbol(o);
+      } else if (/^\s*0\s+HEAD/.test(txt.replace(/^﻿/, ''))) {
+        t = deGED(txt);
+        t.name = trim(f.name.replace(/\.[^.]+$/, '')) || 'Importado';
+      }
+    } catch (e) { t = null; }
+    if (!t) { alert('No se reconoció el archivo. Debe ser una copia .json de esta app o un archivo GEDCOM (.ged).'); return; }
+    var n = 0, k; for (k in t.persons) if (t.persons.hasOwnProperty(k)) n++;
+    var base = t.name, nom = base, c = 2;
+    while (existeNombre(nom)) nom = base + ' (' + (c++) + ')';
+    t.name = nom;
+    if (!confirm('Se creará un árbol nuevo “' + nom + '” con ' + n + ' personas.\nTus árboles actuales no se modifican. ¿Continuar?')) return;
+    IDX.trees.push({ id: t.id, name: t.name }); IDX.current = t.id;
+    T = t; reindex(); focoValido();
+    if (!lsSet('agf_t_' + t.id, JSON.stringify(t))) { IDX.trees.pop(); T = null; iniciar(); pintaDatos(); return; }
+    guardaIdx();
+    alert('Listo: “' + nom + '” importado con ' + n + ' personas.');
+    App.tab('Arbol');
+  };
+  rd.readAsText(f);
+};
+function existeNombre(n) { for (var i = 0; i < IDX.trees.length; i++) if (IDX.trees[i].name === n) return true; return false; }
+function usoMemoria() {
+  var tot = 0, i, k;
+  if (ST.tipo === 'idb') { for (k in ST.cache) if (ST.cache.hasOwnProperty(k)) tot += (k.length + String(ST.cache[k]).length) * 2; return tot; }
+  try { for (i = 0; i < localStorage.length; i++) { k = localStorage.key(i); tot += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch (e) {}
+  return tot;
+}
+function pintaDatos() {
+  var n = 0, k, h = '', i, t, kb = Math.round(usoMemoria() / 1024);
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) n++;
+  $('dEstado').innerHTML = 'Árbol “<b>' + esc(T.name) + '</b>”: ' + n + ' personas. ' +
+    (T.lastBackup ? 'Última copia: ' + esc(fechaLocal(T.lastBackup)) + '. ' : '<b>Aún no has guardado una copia.</b> ') +
+    ((T.changes || 0) ? (T.changes + ' cambio(s) desde entonces. ') : '') +
+    '<br>Guardado en: ' + (ST.tipo === 'idb' ? '<b>base de datos del navegador (IndexedDB)</b>' : '<b>almacenamiento básico (localStorage, ≈5 MB)</b>') +
+    '. Usado: ' + kb + ' KB' + (ST.tipo === 'ls' && kb > 3500 ? ' — <b style="color:#A33B2B">cerca del límite (≈5 MB). Quita fotos o divide el árbol.</b>' : '.') +
+    '<span id="dCupo"></span>';
+  if (ST.tipo === 'idb' && navigator.storage && navigator.storage.estimate) {
+    try {
+      navigator.storage.estimate().then(function (e) {
+        if (e && e.quota && $('dCupo')) $('dCupo').innerHTML = ' Espacio disponible aprox.: ' + Math.round((e.quota - (e.usage || 0)) / 1048576) + ' MB.';
+      }, function () {});
+    } catch (e) {}
+  }
+  for (i = 0; i < IDX.trees.length; i++) {
+    t = IDX.trees[i];
+    h += '<li onclick="App.abrirArbol(\'' + t.id + '\')"><div class="av U">🌳</div><div><div class="nm">' + esc(t.name) + (t.id === T.id ? ' <span class="muted">(abierto)</span>' : '') + '</div></div></li>';
+  }
+  $('dArboles').innerHTML = h;
+  $('dUlt').innerHTML = T.lastBackup ? 'Última copia: <b>' + esc(fechaLocal(T.lastBackup)) + '</b>' : '<b>Todavía no has enviado ninguna copia.</b>';
+  $('dOrden').value = T.orden === 'mp' ? 'mp' : 'pm';
+}
+App.abrirArbol = function (id) {
+  if (id === T.id) { App.tab('Arbol'); return; }
+  IDX.current = id; guardaIdx();
+  T = cargaArbol(id); T.name = nombreEnIdx(id).name; reindex(); ZOOM = 1.2;
+  App.tab('Arbol');
+};
+App.nuevoArbol = function () {
+  var n = prompt('Nombre del árbol nuevo (ej. Familia Quispe):', ''); n = trim(n);
+  if (!n) return;
+  var id = uid('t');
+  IDX.trees.push({ id: id, name: n }); IDX.current = id; guardaIdx();
+  T = arbolVacio(id, n); persist(); reindex(); ZOOM = 1.2;
+  App.tab('Arbol');
+};
+App.renombrar = function () {
+  var h = '<h3>✏️ Nombre de este árbol</h3><p class="muted">Ejemplo: Familia Quispe Mamani</p>';
+  h += '<input class="i" id="nArbol" value="' + esc(T.name) + '" autocomplete="off" />';
+  h += '<button class="btn xl block" onclick="App.guardaNombre()">✅ Guardar el nombre</button>';
+  h += '<button class="btn block sec" onclick="App.cerrar()">Cancelar</button>';
+  abre(h);
+  try { $('nArbol').focus(); $('nArbol').select(); } catch (e) {}
+};
+App.guardaNombre = function () {
+  var n = trim($('nArbol').value);
+  if (!n) { alert('Escribe un nombre.'); return; }
+  T.name = n; nombreEnIdx(T.id).name = n; guardaIdx(); persist();
+  $('hTitulo').innerHTML = esc(n) + ' <span style="font-size:.75em">✏️</span>';
+  App.cerrar(); pintaDatos(); aviso('✅ Nombre cambiado');
+};
+App.borrarArbol = function () {
+  var n = 0, k; for (k in T.persons) if (T.persons.hasOwnProperty(k)) n++;
+  if (!confirm('¿Eliminar el árbol “' + T.name + '” (' + n + ' personas) de este teléfono?\nSi no guardaste una copia .json, se perderá para siempre.')) return;
+  var esc2 = prompt('Para confirmar, escribe BORRAR en mayúsculas:', '');
+  if (esc2 !== 'BORRAR') { alert('No se eliminó nada.'); return; }
+  lsDel('agf_t_' + T.id);
+  IDX.trees = IDX.trees.filter(function (t) { return t.id !== T.id; });
+  IDX.current = IDX.trees.length ? IDX.trees[0].id : null;
+  guardaIdx(); iniciar(); ZOOM = 1.2;
+  App.tab('Datos');
+};
+
+/* ---------- arranque ---------- */
+$('sinjs').style.display = 'none';
+llenaGens();
+stIniciar(function () {
+  var okLS = true;
+  if (ST.tipo === 'ls') { try { localStorage.setItem('agf_test', '1'); localStorage.removeItem('agf_test'); } catch (e) { okLS = false; } }
+  iniciar();
+  if (IDX.letra === 'g2' || IDX.letra === 'g3') document.body.className = IDX.letra;
+  if (!okLS) alert('Este navegador no permite guardar datos (¿modo privado?). Puedes usar la app, pero guarda una copia .json antes de cerrarla.');
+  pintaArbol(true);
+  /* pedir al navegador que no borre los datos por falta de espacio (si lo permite) */
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(null, function () {}); } catch (e) {}
+});
+window.onresize = function () { if ($('vArbol').className.indexOf(' on') >= 0) altoLienzo(); };
+window.onorientationchange = function () { setTimeout(window.onresize, 300); };
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  try { navigator.serviceWorker.register('sw.js').then(null, function () {}); } catch (e) {}
+}
+})();
+</script>
+</body>
+</html>
