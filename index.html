@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<!-- Árbol Familiar v11 (2026-09-29) · archivo único offline · ES5, sin CSS Grid ni variables CSS
+<!-- Árbol Familiar v12 (2026-09-29) · archivo único offline · ES5, sin CSS Grid ni variables CSS
      v2: padre/madre desconocidos quedan en blanco; nota automática cuando una pareja son parientes
      (primos, etc.); orden de apellidos configurable (paterno–materno o materno–paterno) y botón ⇄.
      v3: datos en IndexedDB (mucho más espacio; migra solo desde localStorage, que queda como respaldo
@@ -25,6 +25,9 @@
      (mismos apellidos que los hijos de una pareja y sin papá/mamá distintos); también al agregar un hijo.
      v11: papeles grandes para imprenta o plotter (A2, A1, A0) y botón “Póster en 1 hoja grande”, que elige
      el papel más chico en que la letra se lee bien.
+     v12: “Unir este árbol con otra copia”: junta dos copias .json en un árbol NUEVO (los originales no se tocan),
+     busca a las personas que están en los dos empezando por la coincidencia más cercana (mismo nombre y más
+     parientes en común) y pregunta una por una si es la misma persona.
      (compatible con Android 4.4+ y iPhone). Los datos se guardan en el propio teléfono
      (localStorage) y se respaldan exportando un archivo .json o .ged (GEDCOM). -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -264,6 +267,9 @@ body.g3 .wrap,body.g3 #modal .sheet,body.g3 .tbar{zoom:1.3}
       <button class="btn block sec" onclick="App.exportJSON()">💾 Guardar la copia en este teléfono</button>
       <button class="btn block sec" onclick="App.importar()">📂 Abrir una copia que me enviaron</button>
       <input type="file" id="fImport" accept=".json,.ged,.txt,application/json,text/plain" style="display:none" onchange="App.leerArchivo(this)" />
+      <button class="btn block sec" onclick="App.mezclar()">🔗 Unir este árbol con otra copia (.json)</button>
+      <button class="btn block" id="dMezSigue" style="display:none" onclick="App.mezRevisa()">🔗 Seguir revisando la unión</button>
+      <input type="file" id="fMezcla" accept=".json,.ged,.txt,application/json,text/plain" style="display:none" onchange="App.leerMezcla(this)" />
     </div>
     <button class="mas" onclick="App.toggle('opDatos')">⚙️ Más opciones</button>
     <div id="opDatos" class="oculto">
@@ -286,7 +292,7 @@ body.g3 .wrap,body.g3 #modal .sheet,body.g3 .tbar{zoom:1.3}
         <button class="btn block warn" onclick="App.borrarArbol()">🗑️ Borrar este árbol</button>
       </div>
     </div>
-    <p class="muted" style="text-align:center">Árbol Familiar v11 · funciona sin internet</p>
+    <p class="muted" style="text-align:center">Árbol Familiar v12 · funciona sin internet</p>
   </div>
 </section>
 
@@ -1928,17 +1934,7 @@ App.leerArchivo = function (inp) {
   var f = inp.files && inp.files[0]; if (!f) return;
   var rd = new FileReader();
   rd.onload = function () {
-    var txt = String(rd.result), t = null, o;
-    try {
-      if (/^\s*[\{\[]/.test(txt.replace(/^﻿/, ''))) {
-        o = JSON.parse(txt.replace(/^﻿/, ''));
-        if (o && o.tree && o.tree.persons) t = limpiaArbol(o.tree);
-        else if (o && o.persons) t = limpiaArbol(o);
-      } else if (/^\s*0\s+HEAD/.test(txt.replace(/^﻿/, ''))) {
-        t = deGED(txt);
-        t.name = trim(f.name.replace(/\.[^.]+$/, '')) || 'Importado';
-      }
-    } catch (e) { t = null; }
+    var t = leeCopia(String(rd.result), f.name);
     if (!t) { alert('No se reconoció el archivo. Debe ser una copia .json de esta app o un archivo GEDCOM (.ged).'); return; }
     var n = 0, k; for (k in t.persons) if (t.persons.hasOwnProperty(k)) n++;
     var base = t.name, nom = base, c = 2;
@@ -1953,6 +1949,275 @@ App.leerArchivo = function (inp) {
     App.tab('Arbol');
   };
   rd.readAsText(f);
+};
+/* texto de una copia (.json de esta app o GEDCOM) → árbol limpio, o null */
+function leeCopia(txt, fname) {
+  var t = null, o;
+  txt = txt.replace(/^﻿/, '');
+  try {
+    if (/^\s*[\{\[]/.test(txt)) {
+      o = JSON.parse(txt);
+      if (o && o.tree && o.tree.persons) t = limpiaArbol(o.tree);
+      else if (o && o.persons) t = limpiaArbol(o);
+    } else if (/^\s*0\s+HEAD/.test(txt)) {
+      t = deGED(txt);
+      t.name = trim(String(fname || '').replace(/\.[^.]+$/, '')) || 'Importado';
+    }
+  } catch (e) { t = null; }
+  return t;
+}
+/* ---------- unir dos árboles: el abierto + otra copia ----------
+   Se crea un árbol NUEVO con las personas de los dos (los originales no se tocan).
+   Luego se buscan personas que estén en ambos, empezando por la coincidencia más cercana
+   (mismo nombre y más parientes en común), y se pregunta una por una si es la misma persona. */
+var MEZ = null; /* {tid, nomA, nomB, orig:{id:'A'|'B'}, rel:{id:{f,m,s:[],k:[]}}, eq:{quitado:quedó}, no:{par:1}, hechos:[]} */
+App.mezclar = function () { $('fMezcla').value = ''; $('fMezcla').click(); };
+App.leerMezcla = function (inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    var B = leeCopia(String(rd.result), f.name), A = T, C, k, p, nid, mapa = {}, orig = {}, rel = {}, nA = 0, nB = 0, nom, c = 2;
+    if (!B) { alert('No se reconoció el archivo. Debe ser una copia .json de esta app o un archivo GEDCOM (.ged).'); return; }
+    for (k in A.persons) if (A.persons.hasOwnProperty(k)) nA++;
+    for (k in B.persons) if (B.persons.hasOwnProperty(k)) nB++;
+    if (!nB) { alert('La copia elegida no tiene personas.'); return; }
+    nom = A.name + ' + ' + B.name;
+    while (existeNombre(nom)) nom = A.name + ' + ' + B.name + ' (' + (c++) + ')';
+    if (!confirm('Se creará un árbol NUEVO “' + nom + '” juntando:\n• “' + A.name + '” (' + nA + ' personas)\n• “' + B.name + '” (' + nB + ' personas)\n\nTus árboles actuales no se modifican. Después te preguntaré quiénes están en los dos. ¿Continuar?')) return;
+    C = arbolVacio(uid('t'), nom);
+    C.focus = A.focus; C.up = A.up; C.down = A.down; if (A.orden === 'mp') C.orden = 'mp';
+    for (k in A.persons) if (A.persons.hasOwnProperty(k)) { C.persons[k] = JSON.parse(JSON.stringify(A.persons[k])); orig[k] = 'A'; }
+    for (k in B.persons) if (B.persons.hasOwnProperty(k)) {
+      nid = k; while (C.persons.hasOwnProperty(nid) || mapa.hasOwnProperty('#' + nid)) nid = uid('p') + Math.floor(Math.random() * 1e4);
+      mapa[k] = nid; mapa['#' + nid] = 1;
+    }
+    for (k in B.persons) if (B.persons.hasOwnProperty(k)) {
+      p = JSON.parse(JSON.stringify(B.persons[k]));
+      p.id = mapa[k];
+      p.father = p.father ? mapa[p.father] : null;
+      p.mother = p.mother ? mapa[p.mother] : null;
+      p.spouses = (p.spouses || []).map(function (x) { return mapa[x]; });
+      C.persons[p.id] = p; orig[p.id] = 'B';
+    }
+    if (!C.focus || !C.persons[C.focus]) C.focus = B.focus ? mapa[B.focus] : null;
+    IDX.trees.push({ id: C.id, name: C.name }); IDX.current = C.id;
+    T = C; reindex(); focoValido();
+    if (!lsSet('agf_t_' + C.id, JSON.stringify(C))) { IDX.trees.pop(); IDX.current = A.id; T = A; reindex(); pintaDatos(); return; }
+    guardaIdx();
+    /* foto de los lazos originales, para comparar aunque luego se junten personas */
+    for (k in C.persons) if (C.persons.hasOwnProperty(k)) {
+      p = C.persons[k];
+      rel[k] = { f: P(p.father) ? p.father : null, m: P(p.mother) ? p.mother : null, s: parejas(k), k: (KIDS[k] || []).slice(0) };
+    }
+    MEZ = { tid: C.id, nomA: A.name, nomB: B.name, orig: orig, rel: rel, eq: {}, no: {}, hechos: [] };
+    guardaMez();
+    App.tab('Arbol');
+    App.mezRevisa();
+  };
+  rd.readAsText(f);
+};
+function guardaMez() { if (MEZ) lsSet('agf_mez_' + MEZ.tid, JSON.stringify(MEZ)); }
+function cargaMez() {
+  if (MEZ && MEZ.tid === T.id) return MEZ;
+  var o = null; try { o = JSON.parse(lsGet('agf_mez_' + T.id)); } catch (e) {}
+  MEZ = o && o.orig ? o : null;
+  return MEZ;
+}
+/* id actual de una persona (si se juntó con otra, la que quedó) */
+function vivo(id) { var n = 0; while (id && MEZ.eq[id] && n++ < 1000) id = MEZ.eq[id]; return P(id) ? id : null; }
+function nomPila(p) { return sinTildes(trim(p.given)).replace(/\s+/g, ' '); }
+/* letras cambiadas, de más o de menos entre dos palabras (distancia de edición) */
+function distancia(a, b) {
+  var i, j, ant, fila = [], diag, t;
+  for (j = 0; j <= b.length; j++) fila[j] = j;
+  for (i = 1; i <= a.length; i++) {
+    diag = fila[0]; fila[0] = i;
+    for (j = 1; j <= b.length; j++) {
+      ant = fila[j];
+      t = Math.min(fila[j] + 1, fila[j - 1] + 1, diag + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+      fila[j] = t; diag = ant;
+    }
+  }
+  return fila[b.length];
+}
+/* se escriben casi igual (Saturnina / Saturnino, Quispe / Quispi): 1 letra en palabras cortas, 2 en largas */
+function casi(a, b) {
+  var n = Math.max(a.length, b.length);
+  if (a === b) return true;
+  if (n < 4 || Math.abs(a.length - b.length) > 2) return false;
+  return distancia(a, b) <= (n <= 6 ? 1 : 2);
+}
+/* "ma." o "m" abrevian a "maria" */
+function abrevia(c, l) {
+  var p = c.replace(/\.$/, '');
+  return p.length > 0 && p.length < l.length && (p.length === 1 || p !== c) && l.indexOf(p) === 0;
+}
+/* cómo suena (español): h muda, ll/y/i, v/b, z/ce/ci/s, qu/k/ca-co-cu, ge-gi/j, x/j, w/gu
+   Helena = Elena, Yolanda = Iolanda, Kispe = Quispe, Wamán = Guamán, Jimena = Ximena = Gimena */
+function fonetico(w) {
+  return String(w || '').replace(/\./g, '')
+    .replace(/ch/g, '#').replace(/h/g, '').replace(/#/g, 'ch')
+    .replace(/ll/g, 'y').replace(/y/g, 'i').replace(/v/g, 'b').replace(/w/g, 'gu').replace(/x/g, 'j')
+    .replace(/g([ei])/g, 'j$1').replace(/gu([ei])/g, 'g$1')
+    .replace(/qu/g, 'k').replace(/c([ei])/g, 's$1').replace(/z/g, 's').replace(/c/g, 'k')
+    .replace(/(.)\1/g, '$1');
+}
+function palabraIgual(x, y) { return x === y || abrevia(x, y) || abrevia(y, x); }
+/* 3: mismo nombre y primer apellido · 2: un nombre contiene o abrevia al otro (María / María Luisa / Ma.)
+   · 1: se escriben parecido pero no igual (hay que preguntar para descartar) · 0: distinto */
+function parecido(a, b) {
+  var ga = nomPila(a), gb = nomPila(b), sa = apeNorm(primero(a.surname)), sb = apeNorm(primero(b.surname)), ape = 3, g = 0, wa, wb, i, n, typo = false;
+  if (sa && sb && sa !== sb) { if (!casi(sa, sb) && !casi(fonetico(sa), fonetico(sb))) return 0; ape = 1; }
+  /* “(sin nombre)”: solo vale si comparten parientes (ver mezPuntos) */
+  if (!ga && !gb) return 2;
+  if (!ga || !gb) return 1;
+  if (ga === gb) g = 3;
+  else {
+    wa = ga.split(' '); wb = gb.split(' '); n = Math.min(wa.length, wb.length);
+    for (i = 0; i < n; i++) {
+      if (palabraIgual(wa[i], wb[i])) continue;
+      if (casi(wa[i], wb[i]) || casi(fonetico(wa[i]), fonetico(wb[i]))) { typo = true; continue; }
+      break;
+    }
+    if (i === n) g = typo ? 1 : 2;
+  }
+  return Math.min(g, ape);
+}
+/* compara un pariente de cada lado: +3 ya son la misma, +2 se llaman igual, -3 son distintos, 0 falta uno */
+function mismoPariente(x, y) {
+  x = vivo(x); y = vivo(y);
+  if (!x || !y) return 0;
+  if (x === y) return 3;
+  if (!nomPila(P(x)) || !nomPila(P(y))) return 0; /* “(sin nombre)”: no se sabe si es el mismo */
+  x = parecido(P(x), P(y));
+  return x >= 2 ? 2 : x ? 1 : -3;
+}
+function cuantosComunes(xs, ys, pts) {
+  var s = 0, i, j, x, y, usado = {};
+  for (i = 0; i < xs.length; i++) {
+    x = vivo(xs[i]); if (!x) continue;
+    for (j = 0; j < ys.length; j++) {
+      y = vivo(ys[j]);
+      if (y && !usado[y] && (x === y || parecido(P(x), P(y)))) { usado[y] = 1; s += x === y ? pts * 2 : pts; break; }
+    }
+  }
+  return s;
+}
+/* puntos de cercanía entre a (del árbol abierto) y b (de la otra copia); -1 si no pueden ser la misma */
+function mezPuntos(a, b) {
+  var pa = P(a), pb = P(b), ra = MEZ.rel[a], rb = MEZ.rel[b], s, x, y, par = parecido(pa, pb);
+  if (!par) return -1;
+  if (pa.sex !== 'U' && pb.sex !== 'U' && pa.sex !== pb.sex) return -1;
+  x = yr(pa.birth); y = yr(pb.birth); if (x && y && x !== y) return -1;
+  s = x && y ? 3 : 0;
+  x = yr(pa.death); y = yr(pb.death); if (x && y && x !== y) return -1;
+  if (x && y) s += 2;
+  if (esDescendiente(a, b) || esDescendiente(b, a)) return -1;
+  s += par === 3 ? 1 : 0;
+  if (apeNorm(pa.surname) && apeNorm(pa.surname) === apeNorm(pb.surname)) s += 1;
+  x = mismoPariente(ra.f, rb.f) + mismoPariente(ra.m, rb.m) + cuantosComunes(ra.s, rb.s, 2) + cuantosComunes(ra.k, rb.k, 1);
+  if ((!nomPila(pa) || !nomPila(pb)) && x < 2) return -1;
+  return s + x;
+}
+function mezCandidatos() {
+  var cub = {}, todos = [], k, p, c, r = [], i, j, a, b, s, lista;
+  /* se compara por el primer sonido del nombre (Helena y Elena van juntas); los “(sin nombre)” con todos */
+  for (k in T.persons) if (T.persons.hasOwnProperty(k) && MEZ.orig[k] === 'B') {
+    p = T.persons[k]; c = '#' + fonetico(nomPila(p)).charAt(0);
+    (cub[c] = cub[c] || []).push(k); todos.push(k);
+  }
+  for (k in T.persons) if (T.persons.hasOwnProperty(k) && MEZ.orig[k] === 'A') {
+    c = '#' + fonetico(nomPila(T.persons[k])).charAt(0);
+    lista = c === '#' ? todos : (cub[c] || []).concat(cub['#'] || []);
+    for (j = 0; j < lista.length; j++) {
+      a = k; b = lista[j];
+      if (MEZ.no[a + '|' + b] || !P(b)) continue;
+      s = mezPuntos(a, b);
+      if (s >= 0) r.push({ a: a, b: b, s: s });
+    }
+  }
+  r.sort(function (x, y) { return y.s - x.s; });
+  /* cada persona aparece solo en su mejor coincidencia */
+  var usa = {}, res = [];
+  for (i = 0; i < r.length; i++) if (!usa[r[i].a] && !usa[r[i].b]) { usa[r[i].a] = usa[r[i].b] = 1; res.push(r[i]); }
+  return res;
+}
+/* parientes con que la persona venía en su copia (aunque luego se hayan juntado con otros) */
+function resumenMez(id) {
+  var p = P(id), r = MEZ.rel[id], t = [], n = [], i, x, f, m;
+  if (!r) return resumen(id);
+  for (i = 0; i < r.s.length; i++) if ((x = vivo(r.s[i]))) n.push(nombre(P(x)));
+  if (n.length) t.push((p.sex === 'M' ? 'Esposo' : p.sex === 'F' ? 'Esposa' : 'Pareja') + ' de ' + n.join(', '));
+  n = []; for (i = 0; i < r.k.length; i++) if ((x = vivo(r.k[i])) && n.indexOf(nombre(P(x))) < 0) n.push(nombre(P(x)));
+  if (n.length) t.push((p.sex === 'M' ? 'Papá' : p.sex === 'F' ? 'Mamá' : 'Papá/mamá') + ' de ' + n.join(', '));
+  f = vivo(r.f); m = vivo(r.m); n = [];
+  if (f) n.push(nombre(P(f))); if (m) n.push(nombre(P(m)));
+  if (n.length) t.push((p.sex === 'F' ? 'Hija' : 'Hijo') + ' de ' + n.join(' y '));
+  return t.length ? t.join('. ') + '.' : 'Sin familiares anotados.';
+}
+function nivel(s) { return s >= 6 ? 'alta' : s >= 3 ? 'media' : 'baja'; }
+App.mezRevisa = function () {
+  if (!cargaMez()) { alert('Este árbol no viene de juntar dos copias.'); return; }
+  var r = mezCandidatos(), x, h, pa, pb, par;
+  if (!r.length) { App.mezFin(); return; }
+  x = r[0]; pa = P(x.a); pb = P(x.b);
+  h = '<h3>🔗 ¿Es la misma persona?</h3>';
+  h += '<p class="muted">' + (MEZ.hechos.length ? 'Siguiente coincidencia' : 'Coincidencia más cercana entre los dos árboles') + ' · parecido <b>' + nivel(x.s) + '</b> · ' + (r.length === 1 ? 'es la última' : 'quedan ' + r.length) + '</p>';
+  par = nomPila(pa) || nomPila(pb) ? parecido(pa, pb) : 3;
+  if (!nomPila(pa) || !nomPila(pb)) h += '<div class="aviso">⚠️ En una copia está anotad' + (pa.sex === 'F' || pb.sex === 'F' ? 'a' : 'o') + ' <b>sin nombre</b>, pero tienen familiares en común. Revisa que sea la misma persona.</div>';
+  else if (par === 1) h += '<div class="aviso">⚠️ Los nombres <b>se parecen pero no son iguales</b>. Puede ser un error al escribir o dos personas distintas. Mira sus familiares: si no coinciden, toca <b>“No, son personas distintas”</b>.</div>';
+  else if (par === 2) h += '<div class="aviso">⚠️ En una copia el nombre está <b>más completo o abreviado</b> que en la otra. Revisa que sea la misma persona.</div>';
+  h += '<div class="card"><p class="muted" style="margin:0">En “' + esc(MEZ.nomA) + '”:</p><p class="gran" style="margin:2px 0 0">' + esc(nombre(pa)) + ' <span class="muted">' + esc(anios(pa)) + '</span></p><p class="muted" style="margin:4px 0 0">' + esc(resumenMez(x.a)) + '</p></div>';
+  h += '<div class="card"><p class="muted" style="margin:0">En “' + esc(MEZ.nomB) + '”:</p><p class="gran" style="margin:2px 0 0">' + esc(nombre(pb)) + ' <span class="muted">' + esc(anios(pb)) + '</span></p><p class="muted" style="margin:4px 0 0">' + esc(resumenMez(x.b)) + '</p></div>';
+  h += '<button class="btn xl block" onclick="App.mezSi(\'' + x.a + '\',\'' + x.b + '\')">✅ Sí, es la misma: juntarlas</button>';
+  h += '<button class="btn block sec" onclick="App.mezNo(\'' + x.a + '\',\'' + x.b + '\')">No, son personas distintas</button>';
+  h += '<button class="btn block sec" onclick="App.cerrar()">Seguir después</button>';
+  abre(h);
+};
+App.mezSi = function (a, b) {
+  var nb = nombre(P(b));
+  if (!unirPersonas(a, b)) return;
+  MEZ.eq[b] = a; MEZ.hechos.push(nb);
+  if (!P(T.focus) || MEZ.hechos.length === 1) T.focus = a;
+  guardaMez(); cambio(); refrescar();
+  App.mezRevisa();
+};
+App.mezNo = function (a, b) {
+  MEZ.no[a + '|' + b] = 1; guardaMez();
+  App.mezRevisa();
+};
+/* ¿quedaron unidos? recorre los lazos desde todas las personas del árbol abierto
+   y mira si llega a alguien de la otra copia (o si todos los de la otra copia ya se juntaron) */
+function conectados() {
+  var pila = [], vis = {}, k, id, p, i, sig, quedaB = false;
+  for (k in T.persons) if (T.persons.hasOwnProperty(k)) {
+    if (MEZ.orig[k] === 'A') pila.push(k);
+    else if (MEZ.orig[k] === 'B') quedaB = true;
+  }
+  if (!pila.length) return false;
+  if (!quedaB) return MEZ.hechos.length > 0;
+  while (pila.length) {
+    id = pila.pop(); if (vis[id]) continue; vis[id] = true;
+    if (MEZ.orig[id] === 'B') return true;
+    p = P(id); sig = (KIDS[id] || []).concat(parejas(id));
+    if (P(p.father)) sig.push(p.father);
+    if (P(p.mother)) sig.push(p.mother);
+    for (i = 0; i < sig.length; i++) if (!vis[sig[i]]) pila.push(sig[i]);
+  }
+  return false;
+}
+function hayNo() { for (var k in MEZ.no) if (MEZ.no.hasOwnProperty(k)) return true; return false; }
+App.mezFin = function () {
+  var h = '<h3>🔗 Unión de los dos árboles</h3>', ok = conectados();
+  if (MEZ.hechos.length) h += '<p class="gran">Se juntaron <b>' + MEZ.hechos.length + '</b> persona(s) que estaban en los dos: ' + esc(MEZ.hechos.slice(0, 8).join(', ')) + (MEZ.hechos.length > 8 ? '…' : '') + '.</p>';
+  else if (hayNo()) h += '<p class="gran">No se juntó a nadie: respondiste que las personas parecidas eran distintas.</p>';
+  else h += '<p class="gran">No encontré personas en común (con nombre y apellido iguales o parecidos) entre los dos árboles.</p>';
+  if (ok) h += '<p class="gran">✅ Los dos árboles ya están unidos.</p>';
+  else h += '<div class="aviso">Los dos árboles están juntos en “' + esc(T.name) + '” pero todavía <b>sin conectar</b>. Para conectarlos: abre a una persona, toca <b>Agregar</b> (papá, hijo, esposa…) y elige a alguien que ya está anotado, o usa <b>“Es la misma persona que otra ya anotada”</b>.</div>';
+  h += '<p class="muted">Revisa también “🔎 Revisar parentesco” por si hay hermanos que ahora se pueden cruzar.</p>';
+  h += '<button class="btn xl block" onclick="App.cerrar()">Listo</button>';
+  lsDel('agf_mez_' + MEZ.tid); MEZ = null;
+  abre(h); pintaDatos();
 };
 function existeNombre(n) { for (var i = 0; i < IDX.trees.length; i++) if (IDX.trees[i].name === n) return true; return false; }
 function usoMemoria() {
@@ -1984,6 +2249,7 @@ function pintaDatos() {
   $('dArboles').innerHTML = h;
   $('dUlt').innerHTML = T.lastBackup ? 'Última copia: <b>' + esc(fechaLocal(T.lastBackup)) + '</b>' : '<b>Todavía no has enviado ninguna copia.</b>';
   $('dOrden').value = T.orden === 'mp' ? 'mp' : 'pm';
+  $('dMezSigue').style.display = cargaMez() ? 'block' : 'none';
 }
 App.abrirArbol = function (id) {
   if (id === T.id) { App.tab('Arbol'); return; }
