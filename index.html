@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<!-- Árbol Familiar v14 (2026-10-09) · archivo único offline · ES5, sin CSS Grid ni variables CSS
+<!-- Árbol Familiar v15 (2026-10-09) · archivo único offline · ES5, sin CSS Grid ni variables CSS
      v2: padre/madre desconocidos quedan en blanco; nota automática cuando una pareja son parientes
      (primos, etc.); orden de apellidos configurable (paterno–materno o materno–paterno) y botón ⇄.
      v3: datos en IndexedDB (mucho más espacio; migra solo desde localStorage, que queda como respaldo
@@ -32,6 +32,8 @@
      (los que no cumplen se descartan o se renombran), también al abrir árboles ya guardados.
      v14: los campos de una sola línea (nombres, apellidos, fechas, lugares) ya no aceptan saltos de línea, así una
      copia ajena no puede meter registros falsos en el archivo GEDCOM que se exporta.
+     v15: un antepasado que aparece por varios caminos (por ejemplo, primos casados entre sí) se dibuja una sola vez
+     y las demás veces como casilla ↻, igual que en la descendencia; así un árbol con muchos cruces ya no congela la app.
      (compatible con Android 4.4+ y iPhone). Los datos se guardan en el propio teléfono
      (localStorage) y se respaldan exportando un archivo .json o .ged (GEDCOM). -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -296,7 +298,7 @@ body.g3 .wrap,body.g3 #modal .sheet,body.g3 .tbar{zoom:1.3}
         <button class="btn block warn" onclick="App.borrarArbol()">🗑️ Borrar este árbol</button>
       </div>
     </div>
-    <p class="muted" style="text-align:center">Árbol Familiar v14 · funciona sin internet</p>
+    <p class="muted" style="text-align:center">Árbol Familiar v15 · funciona sin internet</p>
   </div>
 </section>
 
@@ -332,6 +334,8 @@ function tiene(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 function idSeguro(k) { return typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(k) && !(k in Object.prototype); }
 /* v14: texto de una sola línea (los saltos de línea se cambian por un espacio) */
 function unaLinea(s) { return String(s == null ? '' : s).replace(/[\r\n\u2028\u2029]+/g, ' '); }
+/* v15: generaciones válidas = las que ofrece la interfaz (0 a 10 o Todas) */
+function genValida(v) { return v === TODAS || (typeof v === 'number' && v >= 0 && v <= 10 && v === Math.floor(v)); }
 function fotoSegura(f) { return typeof f === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]*$/.test(f); }
 function trim(s) { return String(s == null ? '' : s).replace(/^\s+|\s+$/g, ''); }
 function yr(s) { var m = /(\d{4})/.exec(s || ''); return m ? m[1] : ''; }
@@ -657,20 +661,22 @@ function ubicaDesc(n, x, y, out) {
   }
   return px;
 }
-function armaAnc(id, depth, maxD, camino) {
-  var n = { id: id, f: null, m: null, w: BW }, p = P(id), cw;
+/* v15: "visto" se comparte en todo el árbol de antepasados: quien ya se dibujó por otro camino sale una sola vez
+   más como casilla ↻ (sin repetir sus antepasados). Antes se repetía por cada camino y el dibujo crecía al doble por generación. */
+function armaAnc(id, depth, maxD, visto) {
+  var n = { id: id, f: null, m: null, w: BW, dup: false }, p = P(id), cw;
+  if (visto[id]) { n.dup = true; return n; }
+  visto[id] = true;
   if (depth >= maxD) return n;
-  camino[id] = true;
-  if (p.father && P(p.father) && !camino[p.father]) n.f = armaAnc(p.father, depth + 1, maxD, camino);
-  if (p.mother && P(p.mother) && !camino[p.mother]) n.m = armaAnc(p.mother, depth + 1, maxD, camino);
-  delete camino[id];
+  if (p.father && P(p.father)) n.f = armaAnc(p.father, depth + 1, maxD, visto);
+  if (p.mother && P(p.mother)) n.m = armaAnc(p.mother, depth + 1, maxD, visto);
   cw = n.f && n.m ? n.f.w + SG + n.m.w : (n.f ? n.f.w : (n.m ? n.m.w : 0));
   n.w = Math.max(BW, cw);
   return n;
 }
 function ubicaAnc(n, x, y, out, dibujar) {
   var cx = x + n.w / 2, ps = [], i, tw, px, py, cs = [], bar, mx;
-  if (dibujar) out.boxes.push({ id: n.id, x: cx - BW / 2, y: y });
+  if (dibujar) out.boxes.push({ id: n.id, x: cx - BW / 2, y: y, dup: n.dup });
   if (n.f) ps.push(n.f); if (n.m) ps.push(n.m);
   if (!ps.length) return;
   tw = ps.length === 2 ? ps[0].w + SG + ps[1].w : ps[0].w;
@@ -749,7 +755,7 @@ function disenar() {
     if (pr) { out.notas.push('(' + (out.notas.length + 1) + ') ' + pr.texto); marca[c[0]] = marca[c[1]] = '(' + out.notas.length + ')'; }
   }
   for (i = 0; i < out.boxes.length; i++) { b = out.boxes[i]; if (marca[b.id]) b.nota = marca[b.id]; if (b.dup) hayDup = true; }
-  if (hayDup) out.notas.push('↻ = esta persona ya aparece en otra parte del árbol; su descendencia se dibuja allí.');
+  if (hayDup) out.notas.push('↻ = esta persona ya aparece en otra parte del árbol; su familia se dibuja allí.');
   if (out.medios) out.notas.push('- - - = medio hermano o hermana (comparten solo el papá o solo la mamá).');
   if (out.notas.length) out.notas.unshift('Notas:');
   for (i = 0; i < out.notas.length; i++) if (out.notas[i].length > largo) largo = out.notas[i].length;
@@ -765,7 +771,7 @@ function cajaSVG(b, fotos) {
   var fill = p.sex === 'M' ? '#E3EEF9' : p.sex === 'F' ? '#FBE4EA' : '#EFEFEF';
   var st = p.sex === 'M' ? '#3E7CB1' : p.sex === 'F' ? '#B8456E' : '#888888', sw = 1.5, tx = 10, mc = 20;
   if (b.focus) { st = '#C9892B'; sw = 4; }
-  var s = '<g data-id="' + p.id + '" transform="translate(' + r1(b.x) + ',' + r1(b.y) + ')">';
+  var s = '<g data-id="' + esc(b.id) + '" transform="translate(' + r1(b.x) + ',' + r1(b.y) + ')">';
   s += '<rect width="' + BW + '" height="' + BH + '" rx="10" ry="10" fill="' + fill + '" stroke="' + st + '" stroke-width="' + sw + '"' + (b.dup ? ' stroke-dasharray="6,4"' : '') + '/>';
   if (fotos && p.photo) {
     s += '<image x="7" y="' + ((BH - 56) / 2) + '" width="56" height="56" preserveAspectRatio="xMidYMid slice" xlink:href="' + esc(p.photo) + '"/>';
@@ -776,7 +782,7 @@ function cajaSVG(b, fotos) {
   s += '<text x="' + tx + '" y="44" font-size="13" fill="#1F1B16">' + esc(corta(p.surname, mc + 1)) + '</text>';
   s += '<text x="' + tx + '" y="63" font-size="12" fill="#5A5247">' + esc(anios(p)) + '</text>';
   if (b.dup) s += '<text x="' + (BW - 8) + '" y="64" font-size="13" text-anchor="end" fill="#8C8577">↻</text>';
-  if (b.nota) s += '<text x="' + (BW - 7) + '" y="17" font-size="11" font-weight="bold" text-anchor="end" fill="#A33B2B">⚠' + b.nota + '</text>';
+  if (b.nota) s += '<text x="' + (BW - 7) + '" y="17" font-size="11" font-weight="bold" text-anchor="end" fill="#A33B2B">⚠' + esc(b.nota) + '</text>';
   return s + '</g>';
 }
 function interiorSVG(out, fotos) {
@@ -901,7 +907,7 @@ function ordenadas() {
 function avatar(p) {
   if (p.photo) return '<div class="av"><img src="' + esc(p.photo) + '" alt=""/></div>';
   var ini = (trim(p.given).charAt(0) + trim(p.surname).charAt(0)).toUpperCase() || '?';
-  return '<div class="av ' + (p.sex || 'U') + '">' + esc(ini) + '</div>';
+  return '<div class="av ' + (p.sex === 'M' || p.sex === 'F' ? p.sex : 'U') + '">' + esc(ini) + '</div>';
 }
 App.lista = function () {
   var q = sinTildes(trim($('busca').value)), a = ordenadas(), h = '', n = 0, i, p, tot = a.length, MAX = 300;
@@ -1908,10 +1914,10 @@ function deGED(txt) {
   }
   for (k in fams) if (fams.hasOwnProperty(k)) {
     f = fams[k];
-    var h = map[f.husb] || null, w = map[f.wife] || null;
+    var h = tiene(map, f.husb) ? map[f.husb] : null, w = tiene(map, f.wife) ? map[f.wife] : null;
     if (h && w) { t.persons[h].spouses.push(w); t.persons[w].spouses.push(h); }
     for (j = 0; j < f.chil.length; j++) {
-      var c = map[f.chil[j]]; if (!c) continue;
+      var c = tiene(map, f.chil[j]) ? map[f.chil[j]] : null; if (!c) continue;
       if (h && h !== c) t.persons[c].father = h;
       if (w && w !== c) t.persons[c].mother = w;
     }
@@ -1948,8 +1954,8 @@ function limpiaArbol(src) {
     p.spouses = p.spouses.filter(function (x) { return !!t.persons[x] && x !== k; });
   }
   if (typeof src.focus === 'string' && tiene(mapa, '#' + src.focus) && t.persons[mapa['#' + src.focus]]) t.focus = mapa['#' + src.focus];
-  if (typeof src.up === 'number') t.up = src.up;
-  if (typeof src.down === 'number') t.down = src.down;
+  if (genValida(src.up)) t.up = src.up;
+  if (genValida(src.down)) t.down = src.down;
   if (src.orden === 'mp') t.orden = 'mp';
   return t;
 }
@@ -1957,9 +1963,15 @@ function limpiaArbol(src) {
 function saneaGuardado(t) {
   var k, malo = false, c;
   for (k in t.persons) if (tiene(t.persons, k)) {
-    if (!idSeguro(k) || (t.persons[k] && t.persons[k].photo && !fotoSegura(t.persons[k].photo))) { malo = true; break; }
+    var q = t.persons[k];
+    if (!idSeguro(k) || !q || typeof q !== 'object' || q.id !== k || (q.photo && !fotoSegura(q.photo))) { malo = true; break; }
   }
-  if (!malo) return t;
+  if (!malo) {
+    /* arreglos menores sin reconstruir (así no se pierden las respuestas guardadas de "No") */
+    for (k in t.persons) if (tiene(t.persons, k) && t.persons[k].sex !== 'M' && t.persons[k].sex !== 'F') t.persons[k].sex = 'U';
+    if (!genValida(t.up)) t.up = 3; if (!genValida(t.down)) t.down = 3;
+    return t;
+  }
   c = limpiaArbol(t);
   c.id = t.id; c.name = t.name; c.changes = (t.changes || 0) + 1; c.lastBackup = t.lastBackup || null; c.created = t.created || c.created;
   lsDel('agf_mez_' + t.id); lsDel('agf_norep_' + t.id); lsDel('agf_nohijo_' + t.id);

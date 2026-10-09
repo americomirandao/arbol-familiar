@@ -1,6 +1,6 @@
 /* Árbol Familiar — service worker opcional (solo actúa si la app se sirve por https, p. ej. GitHub Pages).
    Guarda una copia de la app en el teléfono para que abra sin internet. Los datos del árbol NO pasan por aquí. */
-var CACHE = 'arbol-familiar-v14';
+var CACHE = 'arbol-familiar-v15';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', function (e) {
