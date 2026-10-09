@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<!-- Árbol Familiar v12 (2026-09-29) · archivo único offline · ES5, sin CSS Grid ni variables CSS
+<!-- Árbol Familiar v13 (2026-10-09) · archivo único offline · ES5, sin CSS Grid ni variables CSS
      v2: padre/madre desconocidos quedan en blanco; nota automática cuando una pareja son parientes
      (primos, etc.); orden de apellidos configurable (paterno–materno o materno–paterno) y botón ⇄.
      v3: datos en IndexedDB (mucho más espacio; migra solo desde localStorage, que queda como respaldo
@@ -28,6 +28,8 @@
      v12: “Unir este árbol con otra copia”: junta dos copias .json en un árbol NUEVO (los originales no se tocan),
      busca a las personas que están en los dos empezando por la coincidencia más cercana (mismo nombre y más
      parientes en común) y pregunta una por una si es la misma persona.
+     v13: seguridad al abrir copias: fotos solo en base64 de imagen e ids internos solo con letras, números, _ y -
+     (los que no cumplen se descartan o se renombran), también al abrir árboles ya guardados.
      (compatible con Android 4.4+ y iPhone). Los datos se guardan en el propio teléfono
      (localStorage) y se respaldan exportando un archivo .json o .ged (GEDCOM). -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -292,7 +294,7 @@ body.g3 .wrap,body.g3 #modal .sheet,body.g3 .tbar{zoom:1.3}
         <button class="btn block warn" onclick="App.borrarArbol()">🗑️ Borrar este árbol</button>
       </div>
     </div>
-    <p class="muted" style="text-align:center">Árbol Familiar v12 · funciona sin internet</p>
+    <p class="muted" style="text-align:center">Árbol Familiar v13 · funciona sin internet</p>
   </div>
 </section>
 
@@ -320,6 +322,13 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function uid(p) { return p + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+/* v13 (auditoría de seguridad): lo que viene de un archivo o del almacenamiento solo entra a la pantalla si pasa estas pruebas.
+   - id de persona/árbol: letras, números, _ y -; nunca un nombre que ya exista en Object.prototype (__proto__, hasOwnProperty…).
+   - foto: solo imagen en base64 (sin comillas ni nada que pueda salirse del atributo src). */
+/* hasOwnProperty seguro: funciona aunque el objeto traiga una clave llamada "hasOwnProperty" */
+function tiene(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function idSeguro(k) { return typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(k) && !(k in Object.prototype); }
+function fotoSegura(f) { return typeof f === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]*$/.test(f); }
 function trim(s) { return String(s == null ? '' : s).replace(/^\s+|\s+$/g, ''); }
 function yr(s) { var m = /(\d{4})/.exec(s || ''); return m ? m[1] : ''; }
 function sinTildes(s) {
@@ -437,9 +446,9 @@ function arbolVacio(id, name) {
 function cargaArbol(id) {
   var t = null;
   try { t = JSON.parse(lsGet('agf_t_' + id)); } catch (e) { t = null; }
-  if (!t || typeof t.persons !== 'object') t = arbolVacio(id);
+  if (!t || typeof t.persons !== 'object' || !t.persons) t = arbolVacio(id);
   t.id = id;
-  return t;
+  return saneaGuardado(t);
 }
 function nombreEnIdx(id) {
   for (var i = 0; i < IDX.trees.length; i++) if (IDX.trees[i].id === id) return IDX.trees[i];
@@ -447,7 +456,8 @@ function nombreEnIdx(id) {
 }
 function iniciar() {
   try { IDX = JSON.parse(lsGet('agf_index')); } catch (e) { IDX = null; }
-  if (!IDX || !IDX.trees) IDX = { trees: [], current: null };
+  if (!IDX || !IDX.trees || !IDX.trees.filter) IDX = { trees: [], current: null };
+  IDX.trees = IDX.trees.filter(function (x) { return x && idSeguro(x.id) && typeof x.name === 'string'; });
   if (!IDX.trees.length) {
     var id = uid('t');
     IDX.trees.push({ id: id, name: 'Mi familia' });
@@ -754,7 +764,7 @@ function cajaSVG(b, fotos) {
   var s = '<g data-id="' + p.id + '" transform="translate(' + r1(b.x) + ',' + r1(b.y) + ')">';
   s += '<rect width="' + BW + '" height="' + BH + '" rx="10" ry="10" fill="' + fill + '" stroke="' + st + '" stroke-width="' + sw + '"' + (b.dup ? ' stroke-dasharray="6,4"' : '') + '/>';
   if (fotos && p.photo) {
-    s += '<image x="7" y="' + ((BH - 56) / 2) + '" width="56" height="56" preserveAspectRatio="xMidYMid slice" xlink:href="' + p.photo + '"/>';
+    s += '<image x="7" y="' + ((BH - 56) / 2) + '" width="56" height="56" preserveAspectRatio="xMidYMid slice" xlink:href="' + esc(p.photo) + '"/>';
     tx = 70; mc = 13;
   }
   if (b.nota) mc -= 4;
@@ -885,7 +895,7 @@ function ordenadas() {
   return a;
 }
 function avatar(p) {
-  if (p.photo) return '<div class="av"><img src="' + p.photo + '" alt=""/></div>';
+  if (p.photo) return '<div class="av"><img src="' + esc(p.photo) + '" alt=""/></div>';
   var ini = (trim(p.given).charAt(0) + trim(p.surname).charAt(0)).toUpperCase() || '?';
   return '<div class="av ' + (p.sex || 'U') + '">' + esc(ini) + '</div>';
 }
@@ -933,7 +943,7 @@ App.toggle = function (id) { var e = $(id); e.className = e.className.indexOf('o
 App.ver = function (id) {
   var p = P(id); if (!p) return;
   var h = '', i, ps = parejas(id), kids = hijosOrden(KIDS[id] || []), sib = hermanos(id), fam = '', q = '', pr, lug;
-  h += p.photo ? '<img class="foto" src="' + p.photo + '" alt=""/>' : '';
+  h += p.photo ? '<img class="foto" src="' + esc(p.photo) + '" alt=""/>' : '';
   h += '<h3>' + esc(nombre(p)) + '</h3>';
   h += '<p class="gran" style="margin:0 0 10px">';
   if (p.birth || p.birthPlace) h += '👶 Nació' + (p.birth ? ' el ' + esc(p.birth) : '') + (p.birthPlace ? ' en ' + esc(p.birthPlace) : '') + '<br>';
@@ -1905,29 +1915,50 @@ function deGED(txt) {
   return t;
 }
 function limpiaArbol(src) {
-  var t = arbolVacio(uid('t'), trim(src.name) || 'Importado'), k, s, p, campos = ['given', 'surname', 'sex', 'birth', 'birthPlace', 'death', 'deathPlace', 'notes', 'photo'], i;
-  for (k in src.persons) if (src.persons.hasOwnProperty(k)) {
+  var t = arbolVacio(uid('t'), trim(src.name) || 'Importado'), k, s, p, campos = ['given', 'surname', 'sex', 'birth', 'birthPlace', 'death', 'deathPlace', 'notes', 'photo'], i, mapa = {}, usados = {}, nid, n = 0;
+  if (!src.persons || typeof src.persons !== 'object') return t;
+  /* v13: un id que no es seguro se cambia por uno nuevo; los lazos (padre, madre, parejas, foco) se ajustan al id nuevo */
+  for (k in src.persons) if (tiene(src.persons, k) && idSeguro(k)) usados[k] = 1;
+  for (k in src.persons) if (tiene(src.persons, k)) {
+    if (idSeguro(k)) nid = k;
+    else { do { nid = 'p' + Date.now().toString(36) + (n++).toString(36) + Math.floor(Math.random() * 1e6).toString(36); } while (tiene(usados, nid)); usados[nid] = 1; }
+    mapa['#' + k] = nid;
+  }
+  for (k in src.persons) if (tiene(src.persons, k)) {
     s = src.persons[k]; if (!s || typeof s !== 'object') continue;
-    p = { id: k, father: null, mother: null, spouses: [], dead: !!s.dead };
+    nid = mapa['#' + k];
+    p = { id: nid, father: null, mother: null, spouses: [], dead: !!s.dead };
     for (i = 0; i < campos.length; i++) p[campos[i]] = typeof s[campos[i]] === 'string' ? s[campos[i]] : '';
     if (p.sex !== 'M' && p.sex !== 'F') p.sex = 'U';
-    if (p.photo && p.photo.indexOf('data:image/') !== 0) p.photo = '';
-    p.father = typeof s.father === 'string' ? s.father : null;
-    p.mother = typeof s.mother === 'string' ? s.mother : null;
-    if (s.spouses && s.spouses.length) for (i = 0; i < s.spouses.length; i++) if (typeof s.spouses[i] === 'string') p.spouses.push(s.spouses[i]);
-    t.persons[k] = p;
+    if (p.photo && !fotoSegura(p.photo)) p.photo = '';
+    p.father = typeof s.father === 'string' && tiene(mapa, '#' + s.father) ? mapa['#' + s.father] : null;
+    p.mother = typeof s.mother === 'string' && tiene(mapa, '#' + s.mother) ? mapa['#' + s.mother] : null;
+    if (s.spouses && s.spouses.length) for (i = 0; i < s.spouses.length; i++) if (typeof s.spouses[i] === 'string' && tiene(mapa, '#' + s.spouses[i])) p.spouses.push(mapa['#' + s.spouses[i]]);
+    t.persons[nid] = p;
   }
-  for (k in t.persons) if (t.persons.hasOwnProperty(k)) {
+  for (k in t.persons) if (tiene(t.persons, k)) {
     p = t.persons[k];
     if (!t.persons[p.father] || p.father === k) p.father = null;
     if (!t.persons[p.mother] || p.mother === k) p.mother = null;
     p.spouses = p.spouses.filter(function (x) { return !!t.persons[x] && x !== k; });
   }
-  if (typeof src.focus === 'string' && t.persons[src.focus]) t.focus = src.focus;
+  if (typeof src.focus === 'string' && tiene(mapa, '#' + src.focus) && t.persons[mapa['#' + src.focus]]) t.focus = mapa['#' + src.focus];
   if (typeof src.up === 'number') t.up = src.up;
   if (typeof src.down === 'number') t.down = src.down;
   if (src.orden === 'mp') t.orden = 'mp';
   return t;
+}
+/* v13: un árbol que ya estaba guardado (por ejemplo, importado con una versión anterior) se revisa al abrirlo con las mismas pruebas */
+function saneaGuardado(t) {
+  var k, malo = false, c;
+  for (k in t.persons) if (tiene(t.persons, k)) {
+    if (!idSeguro(k) || (t.persons[k] && t.persons[k].photo && !fotoSegura(t.persons[k].photo))) { malo = true; break; }
+  }
+  if (!malo) return t;
+  c = limpiaArbol(t);
+  c.id = t.id; c.name = t.name; c.changes = (t.changes || 0) + 1; c.lastBackup = t.lastBackup || null; c.created = t.created || c.created;
+  lsDel('agf_mez_' + t.id); lsDel('agf_norep_' + t.id); lsDel('agf_nohijo_' + t.id);
+  return c;
 }
 App.importar = function () { $('fImport').value = ''; $('fImport').click(); };
 App.leerArchivo = function (inp) {
